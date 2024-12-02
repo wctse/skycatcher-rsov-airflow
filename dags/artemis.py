@@ -15,6 +15,7 @@ from requests.exceptions import RequestException
 
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
+DO_NOT_UPLOAD = False
 
 # Configuration
 API_ENDPOINT = "https://api.artemisxyz.com/data"
@@ -34,7 +35,7 @@ ASSETS = [
 ]
 
 # Data directory
-DATA_DIR = '/opt/airflow/data/artemis'
+DATA_DIR = '/tmp/artemis_data'
 
 # Reuse common utility functions
 def load_api_key(key_name):
@@ -115,7 +116,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616"
+            query_id="4170616" if not DEV_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -204,27 +205,31 @@ def process_artemis_data(**kwargs):
         
         # Transform data into flat format
         records = []
+        current_date = datetime.now().date()
         for asset, metrics in artemis_data.items():
             # Get all dates from the price data
             dates = [entry['date'] for entry in metrics['price']]
             
             # For each date, create a row with all metrics
             for date in dates:
-                price = next((entry['val'] for entry in metrics['price'] if entry['date'] == date), None)
-                mc = next((entry['val'] for entry in metrics['mc'] if entry['date'] == date), None)
-                fdv = next((entry['val'] for entry in metrics['fdv'] if entry['date'] == date), None)
-                
-                # Handle 0.0 values in market cap (like in the NEAR example)
-                if mc == 0.0:
-                    mc = None
+                date_obj = datetime.strptime(date, '%Y-%m-%d').date()
+                # Sometimes Artemis has incomplete data for the previous day with N/A in mcap, so we skip it and limit the lag to 2 days
+                if (current_date - date_obj).days >= 2:
+                    price = next((entry['val'] for entry in metrics['price'] if entry['date'] == date), None)
+                    mc = next((entry['val'] for entry in metrics['mc'] if entry['date'] == date), None)
+                    fdv = next((entry['val'] for entry in metrics['fdv'] if entry['date'] == date), None)
                     
-                records.append({
-                    'date': date,
-                    'asset': asset,
-                    'price': price,
-                    'mc': mc,
-                    'fdv': fdv
-                })
+                    # Handle 0.0 values in market cap (like in the NEAR example)
+                    if mc == 0.0:
+                        mc = None
+                        
+                    records.append({
+                        'date': date,
+                        'asset': asset,
+                        'price': price,
+                        'mc': mc,
+                        'fdv': fdv
+                    })
         
         # Create DataFrame
         df = (pd.DataFrame(records)
@@ -252,8 +257,6 @@ def process_artemis_data(**kwargs):
         raise AirflowException(f"Error in process_artemis_data: {e}")
 
 def upload_to_dune(**kwargs):
-    DEV_MODE = False
-
     try:
         processed_dir = os.path.join(DATA_DIR, 'processed')
         processed_file = os.path.join(processed_dir, 'asset_metrics.csv')
@@ -263,8 +266,8 @@ def upload_to_dune(**kwargs):
             
         df = pd.read_csv(processed_file)
         
-        if DEV_MODE:
-            print("DEV MODE: Data to be uploaded:")
+        if DO_NOT_UPLOAD:
+            print("DO NOT UPLOAD: Data to be uploaded:")
             print(df.to_string())
             print(f"Total rows: {len(df)}")
         else:

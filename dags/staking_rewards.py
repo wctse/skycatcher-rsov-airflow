@@ -15,6 +15,7 @@ from requests.exceptions import RequestException
 
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
+DO_NOT_UPLOAD = False
 
 # Configuration
 API_ENDPOINT = 'https://api.stakingrewards.com/public/query'
@@ -45,7 +46,7 @@ METRICS = [
 ]
 
 # Data directory
-DATA_DIR = '/opt/airflow/data/staking_rewards'
+DATA_DIR = '/tmp/staking_rewards'
 
 # Utility functions
 def load_api_key(key_name):
@@ -118,7 +119,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616"
+            query_id="4170616" if not DEV_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -179,8 +180,10 @@ def validate_raw_files():
     if not os.path.exists(raw_dir):
         raise AirflowException(f"Raw data directory not found: {raw_dir}")
     
+    blockchains_to_validate = list(BLOCKCHAINS.items())[:1] if DEV_MODE else BLOCKCHAINS.items()
+    
     valid_blockchains = []
-    for blockchain_slug, blockchain_name in BLOCKCHAINS.items():
+    for blockchain_slug, blockchain_name in blockchains_to_validate:
         is_valid = True
         for metric in METRICS:
             raw_file = os.path.join(raw_dir, f'{blockchain_slug}_{metric}_raw.json')
@@ -254,7 +257,7 @@ def fetch_metadata(**kwargs):
         metadata = []
         # Use global DEV_MODE
         blockchains_to_process = list(BLOCKCHAINS.items())[:1] if DEV_MODE else BLOCKCHAINS.items()
-        metrics_to_process = METRICS[:1] if DEV_MODE else METRICS
+        metrics_to_process = METRICS
 
         for blockchain_slug, blockchain_name in blockchains_to_process:
             for metric in metrics_to_process:
@@ -268,7 +271,7 @@ def fetch_metadata(**kwargs):
                 start_date = datetime.strptime(start_date, '%Y-%m-%d') + timedelta(days=1)
                 start_date = start_date.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-                end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')  # Yesterday's date
+                end_date = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')  # Allow Staking Rewards to catch up
 
                 query = f"""
                 {{
@@ -378,12 +381,6 @@ def fetch_metrics(**kwargs):
         with open(metadata_file, 'r') as f:
             metadata = json.load(f)
         print(f"Read metadata from {metadata_file}")
-
-        # Use global DEV_MODE
-        if DEV_MODE:
-            metadata = metadata[:1]
-            print("DEV MODE: Processing only the first chain-metric combination")
-
         print(f"Metadata: {metadata}")
 
         for entry in metadata:
@@ -440,10 +437,6 @@ def fetch_metrics(**kwargs):
             with open(raw_file, 'w') as f:
                 json.dump(metric_data, f)
             print(f"Saved raw data to {raw_file}")
-
-            if DEV_MODE:
-                print("DEV MODE: Exiting after processing one chain-metric combination")
-                break
             
     except Exception as e:
         raise AirflowException(f"Error in fetch_metrics: {e}")
@@ -522,8 +515,6 @@ def process_metrics(**kwargs):
         raise AirflowException(f"Error in process_metrics: {e}")
 
 def upload_to_dune(**kwargs):
-    DEV_MODE = False
-
     try:
         # Get the list of successfully processed blockchains from the previous task
         processed_blockchains = kwargs['task_instance'].xcom_pull(task_ids='convert_to_csv', key='processed_blockchains')
@@ -551,8 +542,8 @@ def upload_to_dune(**kwargs):
                 df.to_csv(csv_path, index=False)
                 print(f"Saved CSV to {csv_path}")
 
-                if DEV_MODE:
-                    print(f"\nDEV MODE: Data to be uploaded for {blockchain_name}:")
+                if DO_NOT_UPLOAD:
+                    print(f"\nDO NOT UPLOAD: Data to be uploaded for {blockchain_name}:")
                     print(df.to_string())
                     print(f"Total rows: {len(df)}")
                     continue
@@ -565,9 +556,6 @@ def upload_to_dune(**kwargs):
             except Exception as e:
                 print(f"Failed to upload {blockchain_name}: {str(e)}")
                 continue
-        
-        if not uploaded_blockchains:
-            raise AirflowException("No blockchains were successfully uploaded to Dune")
         
         print(f"Successfully uploaded blockchains: {uploaded_blockchains}")
         return uploaded_blockchains
