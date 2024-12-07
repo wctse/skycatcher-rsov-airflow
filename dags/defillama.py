@@ -17,6 +17,7 @@ import shutil
 
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
+DO_NOT_UPLOAD = False
 
 upload_to_suffix = "" # use in testing
 
@@ -24,7 +25,7 @@ upload_to_suffix = "" # use in testing
 API_ENDPOINT = 'https://pro-api.llama.fi'
 
 # Data directory
-DATA_DIR = '/opt/airflow/data/defillama'
+DATA_DIR = '/tmp/defillama'
 
 # Configuration JSONs
 TOKENS_CONFIG = {
@@ -414,7 +415,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4226299" # 4170616 for prod, 4226299 for test
+            query_id="4170616" if not DEV_MODE else "4226299" # 4170616 for prod, 4226299 for test
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -1072,8 +1073,6 @@ def apply_interpolation(protocol_data, asset_code, protocol_slug):
 
 def upload_to_dune(**kwargs):
     """Uploads processed data to Dune Analytics."""
-    # Override DEV_MODE to True for this function
-    DEV_MODE = False
     
     try:
         asset_collateral_dir = os.path.join(DATA_DIR, 'asset_collateral_value')
@@ -1087,10 +1086,9 @@ def upload_to_dune(**kwargs):
             
             df = pd.read_csv(csv_file)
             table_name = f"{asset_info['name']}_collateral_value"
-            # table_name = f"{asset_info['name']}_collateral_value{upload_to_suffix}"
             
-            if DEV_MODE:
-                print(f"\nDEV MODE: Data to be uploaded for {asset_code}:")
+            if DO_NOT_UPLOAD:
+                print(f"\nDO NOT UPLOAD: Data to be uploaded for {asset_code}:")
                 print(df.to_string())
                 print(f"Total rows: {len(df)}")
             else:
@@ -1175,9 +1173,6 @@ upload_to_dune_task = PythonOperator(
     dag=dag,
 )
 
-# Update task dependencies
 clear_data_task >> [get_latest_dates_task, fetch_all_protocols_task]
 get_latest_dates_task >> fetch_asset_protocols_task
 [fetch_all_protocols_task, fetch_asset_protocols_task] >> fetch_protocol_tvls_task >> process_tvls_task >> upload_to_dune_task
-
-# process_tvls_task >> upload_to_dune_task

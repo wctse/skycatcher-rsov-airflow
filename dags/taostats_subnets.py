@@ -15,7 +15,7 @@ from requests.exceptions import RequestException
 
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
-TEST_MODE = False  # Set to True to skip data fetching tasks and use saved data
+DO_NOT_UPLOAD = False
 
 # Configuration
 API_ENDPOINTS = {
@@ -25,7 +25,7 @@ API_ENDPOINTS = {
 QUERY_LIMIT = 200
 
 # Data directory
-DATA_DIR = '/opt/airflow/data/taostats/subnet'
+DATA_DIR = '/tmp/taostats/subnet'
 SUBNET_HISTORY_DIR = os.path.join(DATA_DIR, 'subnet_history')
 
 # Reused utility functions from existing DAGs
@@ -102,7 +102,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616"
+            query_id="4170616" if not DEV_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -363,7 +363,6 @@ def process_subnet_data(**kwargs):
     try:
         print("Starting process_subnet_data")
         print(f"Running in {'DEV' if DEV_MODE else 'PRODUCTION'} mode")
-        print(f"Using {'SAVED' if TEST_MODE else 'FRESH'} data")
 
         # Step 1: Check required directories and files exist
         required_dirs = [DATA_DIR, SUBNET_HISTORY_DIR]
@@ -379,12 +378,8 @@ def process_subnet_data(**kwargs):
             if not os.path.exists(file_path):
                 raise AirflowException(f"Required file not found: {file_path}")
 
-        # Step 2: Skip validation of latest_dates file in TEST_MODE
-        if not TEST_MODE:
-            validate_latest_dates_file()
-            print("Validated latest dates file")
-        else:
-            print("Skipping latest dates validation in TEST_MODE")
+        validate_latest_dates_file()
+        print("Validated latest dates file")
 
         # Step 3: Fetch baseline values from Dune
         print("Fetching baseline values from Dune...")
@@ -559,8 +554,6 @@ def process_subnet_data(**kwargs):
         raise AirflowException(f"Error in process_subnet_data: {e}")
 
 def upload_to_dune(**kwargs):
-    DEV_MODE = False
-
     try:
         processed_dir = os.path.join(DATA_DIR, 'processed')
         processed_file = os.path.join(processed_dir, 'subnet_summary.csv')
@@ -570,8 +563,8 @@ def upload_to_dune(**kwargs):
         
         df = pd.read_csv(processed_file)
         
-        if DEV_MODE:
-            print("DEV MODE: Data to be uploaded:")
+        if DO_NOT_UPLOAD:
+            print("DO NOT UPLOAD: Data to be uploaded:")
             print(df.to_string())
             print(f"Total rows: {len(df)}")
         else:

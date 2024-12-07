@@ -15,13 +15,14 @@ from requests.exceptions import RequestException
 
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
+DO_NOT_UPLOAD = False
 
 # Configuration
-API_ENDPOINT = 'https://api-prod-v2.taostats.io/api/stats/history/v1'
+API_ENDPOINT = 'https://api.taostats.io/api/stats/history/v1'
 QUERY_LIMIT = 200
 
 # Data directory
-DATA_DIR = '/opt/airflow/data/taostats/network'
+DATA_DIR = '/tmp/taostats/network'
 
 # Utility functions
 def load_api_key(key_name):
@@ -93,20 +94,7 @@ def validate_latest_dates_file():
     df = pd.read_csv(latest_dates_file)
     if not all(col in df.columns for col in ['table_name', 'max_date']):
         raise AirflowException(f"Invalid format in latest_dates.csv. Expected columns: table_name, max_date")
-
-def get_page_mapping():
-    mapping_file = os.path.join(DATA_DIR, 'page_mapping.json')
-    if os.path.exists(mapping_file):
-        with open(mapping_file, 'r') as f:
-            return json.load(f)
-    return {"last_date": None, "page_number": 1}
-
-def update_page_mapping(last_date, page_number):
-    mapping_file = os.path.join(DATA_DIR, 'page_mapping.json')
-    mapping = {"last_date": last_date, "page_number": page_number}
-    with open(mapping_file, 'w') as f:
-        json.dump(mapping, f)
-
+    
 # Dune functions
 def fetch_dune_table_dates(**kwargs):
     try:
@@ -117,7 +105,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616"
+            query_id="4170616" if not DEV_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -175,18 +163,18 @@ def fetch_network_stats(**kwargs):
         # Calculate one day before, but keep original filtering
         start_date = (datetime.strptime(latest_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
         print(f"One day before latest date: {start_date}")
-        
-        # Get the page mapping
-        page_mapping = get_page_mapping()
-        current_page = page_mapping["page_number"]
-        print(f"Starting from page: {current_page}")
+
+        current_page = 1
+        # Convert start date to Unix timestamp
+        start_timestamp = int(datetime.strptime(start_date, '%Y-%m-%d').timestamp())
+        print(f"Start date {start_date} converted to Unix timestamp: {start_timestamp}")
         
         all_data = []
         has_more_data = True
         
         while has_more_data:
             print(f"\nFetching page {current_page}")
-            url = f"{API_ENDPOINT}?limit={QUERY_LIMIT}&page={current_page}"
+            url = f"{API_ENDPOINT}?limit={QUERY_LIMIT}&page={current_page}&timestamp_start={start_timestamp}"
             
             response = make_api_request(
                 url,
@@ -244,12 +232,6 @@ def fetch_network_stats(**kwargs):
             with open(raw_file, 'w') as f:
                 json.dump(all_data, f)
             print(f"Saved {len(all_data)} records to {raw_file}")
-            
-            # Update the page mapping
-            if all_data:
-                last_date = all_data[-1]['timestamp'].split('T')[0]
-                update_page_mapping(last_date, current_page)
-                print(f"Updated page mapping - Last date: {last_date}, Page: {current_page}")
         else:
             # Get latest date from Dune
             latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
@@ -338,16 +320,13 @@ def process_network_stats(**kwargs):
         raise AirflowException(f"Error in process_network_stats: {e}")
 
 def upload_to_dune(**kwargs):
-    # Override DEV_MODE to be True for this function
-    DEV_MODE = False
-    
     try:
         # Read the processed CSV
         csv_file = os.path.join(DATA_DIR, 'stats_history.csv')
         df = pd.read_csv(csv_file)
         
-        if DEV_MODE:
-            print(f"DEV MODE: Data to be uploaded:")
+        if DO_NOT_UPLOAD:
+            print(f"DO NOT UPLOAD: Data to be uploaded:")
             print(df.to_string())
             print(f"Total rows: {len(df)}")
         else:
