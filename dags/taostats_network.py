@@ -2,6 +2,9 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 from airflow.exceptions import AirflowException
+from airflow.hooks.base import BaseHook
+from sqlalchemy import create_engine
+from sqlalchemy.sql import text
 from datetime import datetime, timedelta
 import requests
 import json
@@ -23,6 +26,12 @@ QUERY_LIMIT = 200
 
 # Data directory
 DATA_DIR = '/tmp/taostats/network'
+TABLE_NAME = 'bittensor_network_stats'
+
+rds_conn = BaseHook.get_connection('rds_connection')
+rds_engine = create_engine(
+    f'postgresql://{rds_conn.login}:{rds_conn.password}@{rds_conn.host}:{rds_conn.port}/{rds_conn.schema}'
+)
 
 # Utility functions
 def load_api_key(key_name):
@@ -87,14 +96,28 @@ def ensure_dir(directory):
     else:
         print(f"Directory already exists: {directory}")
 
-def validate_latest_dates_file():
-    latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
-    if not os.path.exists(latest_dates_file):
-        raise AirflowException(f"Latest dates file not found: {latest_dates_file}")
-    df = pd.read_csv(latest_dates_file)
-    if not all(col in df.columns for col in ['table_name', 'max_date']):
-        raise AirflowException(f"Invalid format in latest_dates.csv. Expected columns: table_name, max_date")
+def validate_latest_dune_dates_file():
+    latest_dune_dates_file = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
+
+    if not os.path.exists(latest_dune_dates_file):
+        raise AirflowException(f"Latest dates file not found: {latest_dune_dates_file}")
     
+    df = pd.read_csv(latest_dune_dates_file)
+
+    if not all(col in df.columns for col in ['table_name', 'max_date']):
+        raise AirflowException(f"Invalid format in latest_dune_dates.csv. Expected columns: table_name, max_date")
+    
+def validate_latest_rds_dates_file():
+    latest_rds_dates_file = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+
+    if not os.path.exists(latest_rds_dates_file):
+        raise AirflowException(f"Latest dates file not found: {latest_rds_dates_file}")
+    
+    df = pd.read_csv(latest_rds_dates_file)
+
+    if not all(col in df.columns for col in ['table_name', 'max_date']):
+        raise AirflowException(f"Invalid format in latest_rds_dates.csv. Expected columns: table_name, max_date")
+
 # Dune functions
 def fetch_dune_table_dates(**kwargs):
     try:
@@ -105,20 +128,42 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616" if not DEV_MODE else "4226299"
+            query_id="4170616" # "4170616" if not DEV_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
         print(f"Output from fetch_dune_table_dates: {df.to_dict('records')}")
         
         ensure_dir(DATA_DIR)
-        file_path = os.path.join(DATA_DIR, 'latest_dates.csv')
+        file_path = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
         df.to_csv(file_path, index=False)
         print(f"Saved latest dates to {file_path}")
         
-        validate_latest_dates_file()
+        validate_latest_dune_dates_file()
+
     except Exception as e:
         raise AirflowException(f"Error in fetch_dune_table_dates: {e}")
+
+def fetch_rds_table_dates(**kwargs):
+    try:        
+        query = text(f"""
+            SELECT '{TABLE_NAME}' as table_name, MAX(date) as max_date 
+            FROM {TABLE_NAME}
+        """)
+        
+        df = pd.read_sql(query, rds_engine)
+        
+        # Save RDS dates to a separate file
+        ensure_dir(DATA_DIR)
+        file_path = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+        df.to_csv(file_path, index=False)
+        print(f"Saved RDS dates to {file_path}")
+        print(f"Latest RDS dates: {df.to_string()}")
+        
+        validate_latest_rds_dates_file()
+
+    except Exception as e:
+        raise AirflowException(f"Error in fetch_rds_table_dates: {e}")
 
 def insert_df_to_dune(df, table_name):
     try:
@@ -136,44 +181,66 @@ def insert_df_to_dune(df, table_name):
             content_type="text/csv"
         )
         return response
+    
     except Exception as e:
         raise AirflowException(f"Error in insert_df_to_dune: {e}")
+    
+def parse_latest_dates(delta=0):
+    validate_latest_dune_dates_file()
+    latest_dune_dates_file = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
+    latest_dune_dates_df = pd.read_csv(latest_dune_dates_file)
+
+    validate_latest_rds_dates_file()
+    latest_rds_dates_file = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+    latest_rds_dates_df = pd.read_csv(latest_rds_dates_file)
+
+    dune_date = latest_dune_dates_df.loc[
+        latest_dune_dates_df['table_name'] == TABLE_NAME,
+        'max_date'
+    ].iloc[0]
+
+    rds_date = latest_rds_dates_df.loc[
+        latest_rds_dates_df['table_name'] == TABLE_NAME,
+        'max_date'
+    ].iloc[0]
+
+    # Convert string dates to datetime objects for comparison
+    dune_date = datetime.strptime(dune_date, '%Y-%m-%d') + timedelta(days=delta)
+    rds_date = datetime.strptime(rds_date, '%Y-%m-%d') + timedelta(days=delta)
+
+    print(f"Dune date: {dune_date}")
+    print(f"RDS date: {rds_date}")
+    
+    # Get the earliest date to ensure we don't miss any data
+    min_of_max_dates = min(dune_date, rds_date)
+
+    return {
+        'dune_date': dune_date,
+        'rds_date': rds_date,
+        'min_of_max_dates': min_of_max_dates
+    }
 
 # Task functions
-def fetch_network_stats(**kwargs):
+def fetch_network_stats(**kwargs):  
     try:
         print("Starting fetch_network_stats task")
+        
         api_key = load_api_key("api_key_taostats")
         if not api_key:
             raise ValueError("Taostats API key not found")
         
-        validate_latest_dates_file()
-        
-        # Read the latest dates from Dune
-        latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
-        latest_dates_df = pd.read_csv(latest_dates_file)
-        print(f"Latest dates DataFrame: {latest_dates_df.to_dict('records')}")
-        
-        latest_date = latest_dates_df.loc[
-            latest_dates_df['table_name'] == 'bittensor_network_stats', 
-            'max_date'
-        ].iloc[0]
-        print(f"Latest date from Dune: {latest_date}")
-        
-        # Calculate one day before, but keep original filtering
-        start_date = (datetime.strptime(latest_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
-        print(f"One day before latest date: {start_date}")
+        latest_dates = parse_latest_dates(-1) # The data is usually timestamped at 23:59 UTC, so we need to fetch the previous day
+        start_date = (latest_dates['min_of_max_dates'])
+        start_timestamp = int(start_date.timestamp())
 
-        current_page = 1
-        # Convert start date to Unix timestamp
-        start_timestamp = int(datetime.strptime(start_date, '%Y-%m-%d').timestamp())
-        print(f"Start date {start_date} converted to Unix timestamp: {start_timestamp}")
+        print(f"Fetching network stats from {start_date}")
         
         all_data = []
         has_more_data = True
+        current_page = 1
         
         while has_more_data:
-            print(f"\nFetching page {current_page}")
+            print(f"\nFetching page {current_page} with unix timestamp ({start_timestamp})")
             url = f"{API_ENDPOINT}?limit={QUERY_LIMIT}&page={current_page}&timestamp_start={start_timestamp}"
             
             response = make_api_request(
@@ -188,43 +255,25 @@ def fetch_network_stats(**kwargs):
                 
             data = response['data']
             print(f"Received {len(data)} records")
+            print(f"Sample of raw data: {json.dumps(data[-1], indent=2)}")
             
             if not data:
                 print("Empty data received")
                 break
                 
-            # Print complete raw data structure
-            print("\nRaw data received from API:")
-            for item in data[:5]:  # Print first 5 records to avoid too much output
-                print("\nComplete data structure for record:")
-                print(json.dumps(item, indent=2))
-            print("..." if len(data) > 5 else "")
-                
-            # Convert timestamps to dates and filter - keep original logic
-            filtered_data = []
-            for item in data:
-                date = item['timestamp'].split('T')[0]
-                if date > start_date:
-                    filtered_data.append(item)
-                    
-            # Print complete filtered data details
-            print(f"\nFiltered data (records after {start_date}):")
-            for item in filtered_data:
-                print("\nComplete filtered record:")
-                print(json.dumps(item, indent=2))
-            
-            print(f"\nFiltered to {len(filtered_data)} new records")
-            
+            filtered_data = [item for item in data if datetime.strptime(item['timestamp'].split('T')[0], '%Y-%m-%d') > start_date]
             if filtered_data:
                 all_data.extend(filtered_data)
-                
+            
+            print(f"\nFiltered and processed to {len(filtered_data)} new records")
+            
             # Check if there's more data to fetch
             if len(data) < QUERY_LIMIT or (DEV_MODE and current_page == 1):
                 print("No more data to fetch" if len(data) < QUERY_LIMIT else "DEV_MODE: Stopping after first page")
                 has_more_data = False
             else:
                 current_page += 1
-        
+
         if all_data:
             # Save the raw data
             ensure_dir(DATA_DIR)
@@ -232,18 +281,9 @@ def fetch_network_stats(**kwargs):
             with open(raw_file, 'w') as f:
                 json.dump(all_data, f)
             print(f"Saved {len(all_data)} records to {raw_file}")
+
         else:
-            # Get latest date from Dune
-            latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
-            latest_dates_df = pd.read_csv(latest_dates_file)
-            latest_dune_date = latest_dates_df.loc[
-                latest_dates_df['table_name'] == 'bittensor_network_stats', 
-                'max_date'
-            ].iloc[0]
-            
-            print(f"Latest date in Dune: {latest_dune_date}")
-            print("Latest date in fetched data: No new data available")
-            print("No new data to save")
+            print(f"No new data to save. Start date: {start_date}. Current date: {datetime.now().strftime('%Y-%m-%d')}. Exiting fetch_network_stats.")
             
     except Exception as e:
         print(f"Error in fetch_network_stats: {str(e)}")
@@ -259,6 +299,7 @@ def process_network_stats(**kwargs):
             raw_data = json.load(f)
         
         print(f"Read {len(raw_data)} records from {raw_file}")
+        latest_dates = parse_latest_dates()
         
         if DEV_MODE:
             print("DEV_MODE: Processing only first page of results")
@@ -273,47 +314,51 @@ def process_network_stats(**kwargs):
             dates_data[date].append(item)
 
         # Process the data, skipping the latest incomplete day
-        processed_data = {}
+        processed_data = []
         for date, items in sorted(dates_data.items())[:-1]:  # Skip the last (potentially incomplete) day
             # Take the earliest entry for each complete day
+            print(f"Processing item: {items}")
             item = items[0]
             
             # Get date and increment by one day to align with data reporting
             date_obj = datetime.strptime(date, '%Y-%m-%d')
             date_obj = date_obj + timedelta(days=1)
             date_str = date_obj.strftime('%Y-%m-%d')
+
             
-            # Only keep the first entry for each date
-            if date_str not in processed_data:
-                processed_record = {
-                    'date': date_str,
-                    'block_number': item['block_number'],
-                    'issued': float(item['issued']) / 1e9,
-                    'staked': float(item['staked']) / 1e9,
-                    'accounts': item['accounts'],
-                    'active_accounts': item['active_accounts'],
-                    'balance_holders': item['balance_holders'],
-                    'active_balance_holders': item['active_balance_holders'],
-                    'extrinsics': item['extrinsics'],
-                    'transfers': item['transfers'],
-                    'subnets': item['subnets'],
-                    'subnet_registration_cost': float(item['subnet_registration_cost']) / 1e9
-                }
-                processed_data[date_str] = processed_record
-                if DEV_MODE:
-                    print(f"Processed record for {date_str}: {processed_record}")
+            processed_record = {
+                'date': date_str,
+                'block_number': item['block_number'],
+                'issued': float(item['issued']) / 1e9,
+                'staked': float(item['staked']) / 1e9,
+                'accounts': item.get('accounts', 0),
+                'active_accounts': item.get('active_accounts', 0),
+                'balance_holders': item.get('balance_holders', 0),
+                'active_balance_holders': item.get('active_balance_holders', 0),
+                'extrinsics': item.get('extrinsics', 0),
+                'transfers': item.get('transfers', 0),
+                'subnets': item.get('subnets', 0),
+                'subnet_registration_cost': float(item.get('subnet_registration_cost', 0)) / 1e9
+            }
+            processed_data.append(processed_record)
         
         # Convert to DataFrame and save as CSV
-        df = pd.DataFrame(list(processed_data.values()))
-        csv_file = os.path.join(DATA_DIR, 'stats_history.csv')
-        df.to_csv(csv_file, index=False)
+        df = pd.DataFrame(processed_data)
+        print(f"Processed data: {df.to_string(index=False)}")
+        df['date'] = pd.to_datetime(df['date'])
+
+        # Create two filtered versions
+        df_dune = df[df['date'] > latest_dates['dune_date']].copy()
+        df_rds = df[df['date'] > latest_dates['rds_date']].copy()
+
+        processed_dir = os.path.join(DATA_DIR, 'processed')
+        ensure_dir(processed_dir)
         
-        print(f"Processed and saved {len(df)} entries to {csv_file}")
-        if DEV_MODE:
-            print("DataFrame head:")
-            print(df.head().to_string())
-            print("\nDataFrame info:")
-            print(df.info())
+        df_dune.to_csv(os.path.join(processed_dir, 'stats_history_dune.csv'), index=False)
+        df_rds.to_csv(os.path.join(processed_dir, 'stats_history_rds.csv'), index=False)
+        
+        print(f"Processed and saved {len(df_dune)} records for Dune from {df_dune['date'].min()} to {df_dune['date'].max()}")
+        print(f"Processed and saved {len(df_rds)} records for RDS from {df_rds['date'].min()} to {df_rds['date'].max()}")
         
     except Exception as e:
         print(f"Error in process_network_stats: {str(e)}")
@@ -321,21 +366,48 @@ def process_network_stats(**kwargs):
 
 def upload_to_dune(**kwargs):
     try:
-        # Read the processed CSV
-        csv_file = os.path.join(DATA_DIR, 'stats_history.csv')
+        csv_file = os.path.join(DATA_DIR, 'processed', 'stats_history_dune.csv')
         df = pd.read_csv(csv_file)
         
         if DO_NOT_UPLOAD:
             print(f"DO NOT UPLOAD: Data to be uploaded:")
             print(df.to_string())
             print(f"Total rows: {len(df)}")
+            
         else:
-            # Upload to Dune
             response = insert_df_to_dune(df, 'bittensor_network_stats')
             print(f"Uploaded data to Dune. Response: {response}")
         
     except Exception as e:
         raise AirflowException(f"Error in upload_to_dune: {e}")
+    
+def upload_to_rds(**kwargs):
+    try:
+        processed_file = os.path.join(DATA_DIR, 'processed', 'stats_history_rds.csv')
+        
+        if not os.path.exists(processed_file):
+            raise AirflowException(f"Processed file not found: {processed_file}")
+            
+        df = pd.read_csv(processed_file)
+        
+        if DO_NOT_UPLOAD:
+            print("DO NOT UPLOAD: Data to be uploaded to RDS:")
+            print(df.to_string())
+            print(f"Total rows: {len(df)}")
+            return
+
+        df.to_sql(
+            TABLE_NAME,
+            rds_engine,
+            if_exists='append',
+            index=False,
+            method='multi',
+            chunksize=1000
+        )
+        print(f"Successfully uploaded {len(df)} rows to RDS table {TABLE_NAME}")
+            
+    except Exception as e:
+        raise AirflowException(f"Error in upload_to_rds: {e}")
 
 # DAG definition
 default_args = {
@@ -356,9 +428,15 @@ dag = DAG(
     catchup=False
 )
 
-get_latest_dates_task = PythonOperator(
-    task_id='get_latest_dates',
+fetch_dune_table_dates_task = PythonOperator(
+    task_id='fetch_dune_table_dates',
     python_callable=fetch_dune_table_dates,
+    dag=dag,
+)
+
+fetch_rds_table_dates_task = PythonOperator(
+    task_id='fetch_rds_table_dates',
+    python_callable=fetch_rds_table_dates,
     dag=dag,
 )
 
@@ -380,5 +458,11 @@ upload_to_dune_task = PythonOperator(
     dag=dag,
 )
 
+upload_to_rds_task = PythonOperator(
+    task_id='upload_to_rds',
+    python_callable=upload_to_rds,
+    dag=dag,
+)
+
 # Set up task dependencies
-get_latest_dates_task >> fetch_network_stats_task >> process_network_stats_task >> upload_to_dune_task
+[fetch_dune_table_dates_task, fetch_rds_table_dates_task] >> fetch_network_stats_task >> process_network_stats_task >> [upload_to_dune_task, upload_to_rds_task]

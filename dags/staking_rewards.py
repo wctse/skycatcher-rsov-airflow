@@ -2,6 +2,8 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 from airflow.exceptions import AirflowException
+from airflow.hooks.base import BaseHook
+from sqlalchemy import create_engine, text
 from datetime import datetime, timedelta
 import requests
 import json
@@ -16,6 +18,11 @@ from requests.exceptions import RequestException
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
 DO_NOT_UPLOAD = False
+
+rds_conn = BaseHook.get_connection('rds_connection')
+rds_engine = create_engine(
+    f'postgresql://{rds_conn.login}:{rds_conn.password}@{rds_conn.host}:{rds_conn.port}/{rds_conn.schema}'
+)
 
 # Configuration
 API_ENDPOINT = 'https://api.stakingrewards.com/public/query'
@@ -47,6 +54,7 @@ METRICS = [
 
 # Data directory
 DATA_DIR = '/tmp/staking_rewards'
+TABLE_NAMES = [blockchain_name + '_staking' for blockchain_name in BLOCKCHAINS.values()]
 
 # Utility functions
 def load_api_key(key_name):
@@ -119,7 +127,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616" if not DEV_MODE else "4226299"
+            query_id="4170616" #"4170616" if not DEV_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -127,14 +135,39 @@ def fetch_dune_table_dates(**kwargs):
         
         # Save the latest dates to a file
         ensure_dir(DATA_DIR)
-        file_path = os.path.join(DATA_DIR, 'latest_dates.csv')
+        file_path = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
         df.to_csv(file_path, index=False)
         print(f"Saved latest dates to {file_path}")
         
-        validate_latest_dates_file()
+        validate_latest_dune_dates_file()
     except Exception as e:
         raise AirflowException(f"Error in fetch_dune_table_dates: {e}")
 
+def fetch_rds_table_dates(**kwargs):
+    try:
+        latest_rds_dates_df = pd.DataFrame()
+
+        for table_name in TABLE_NAMES:
+            query = text(f"""
+                SELECT '{table_name}' as table_name, MAX(date) as max_date 
+                FROM {table_name}
+            """)
+            
+            df = pd.read_sql(query, rds_engine)
+            latest_rds_dates_df = pd.concat([latest_rds_dates_df, df])
+            
+        # Save RDS dates to a separate file
+        ensure_dir(DATA_DIR)
+        file_path = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+        latest_rds_dates_df.to_csv(file_path, index=False)
+        print(f"Saved RDS dates to {file_path}")
+        print(f"Latest RDS dates: {latest_rds_dates_df.to_string()}")
+        
+        validate_latest_rds_dates_file()
+
+    except Exception as e:
+        raise AirflowException(f"Error in fetch_rds_table_dates: {e}")
+    
 def insert_df_to_dune(df, table_name):
     try:
         api_key = load_api_key("api_key_dune")
@@ -153,30 +186,97 @@ def insert_df_to_dune(df, table_name):
         return response
     except Exception as e:
         raise AirflowException(f"Error in insert_df_to_dune: {e}")
+    
+def parse_latest_dates(delta=0):
+    validate_latest_dune_dates_file()
+    latest_dune_dates_file = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
+    latest_dune_dates_df = pd.read_csv(latest_dune_dates_file)
 
-# Input validation functions
-def validate_latest_dates_file():
-    latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
-    if not os.path.exists(latest_dates_file):
-        raise AirflowException(f"Latest dates file not found: {latest_dates_file}")
-    df = pd.read_csv(latest_dates_file)
+    validate_latest_rds_dates_file()
+    latest_rds_dates_file = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+    latest_rds_dates_df = pd.read_csv(latest_rds_dates_file)
+
+    data = {
+        'dune_date': [],
+        'rds_date': [],
+        'min_of_max_dates': []
+    }
+    table_names = []
+
+    for table_name in TABLE_NAMES:
+        try:
+            dune_date = latest_dune_dates_df.loc[
+                latest_dune_dates_df['table_name'] == table_name,
+                'max_date'
+            ].iloc[0]
+
+            rds_date = latest_rds_dates_df.loc[
+                latest_rds_dates_df['table_name'] == table_name,
+                'max_date'
+            ].iloc[0]
+
+            # Convert string dates to datetime objects for comparison
+            dune_date = datetime.strptime(dune_date, '%Y-%m-%d') + timedelta(days=delta)
+            rds_date = datetime.strptime(rds_date, '%Y-%m-%d') + timedelta(days=delta)
+            min_of_max_dates = min(dune_date, rds_date)
+
+            print(f"{table_name} - Dune date: {dune_date}, RDS date: {rds_date}, Fetching from date: {min_of_max_dates}")
+
+            # Append values to lists
+            table_names.append(table_name)
+            data['dune_date'].append(dune_date)
+            data['rds_date'].append(rds_date) 
+            data['min_of_max_dates'].append(min_of_max_dates)
+
+        except (IndexError, KeyError) as e:
+            print(f"Warning: Could not find dates for table {table_name}: {str(e)}")
+            continue
+
+    # Create DataFrame with table_names as index
+    results = pd.DataFrame(data, index=table_names)
+    return results
+
+def validate_latest_dune_dates_file():
+    latest_dune_dates_file = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
+
+    if not os.path.exists(latest_dune_dates_file):
+        raise AirflowException(f"Latest dates file not found: {latest_dune_dates_file}")
+    
+    df = pd.read_csv(latest_dune_dates_file)
+
     if not all(col in df.columns for col in ['table_name', 'max_date']):
-        raise AirflowException(f"Invalid format in latest_dates.csv. Expected columns: table_name, max_date")
+        raise AirflowException(f"Invalid format in latest_dune_dates.csv. Expected columns: table_name, max_date")
+    
+def validate_latest_rds_dates_file():
+    latest_rds_dates_file = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+
+    if not os.path.exists(latest_rds_dates_file):
+        raise AirflowException(f"Latest dates file not found: {latest_rds_dates_file}")
+    
+    df = pd.read_csv(latest_rds_dates_file)
+
+    if not all(col in df.columns for col in ['table_name', 'max_date']):
+        raise AirflowException(f"Invalid format in latest_rds_dates.csv. Expected columns: table_name, max_date")
 
 def validate_metadata_file():
     metadata_file = os.path.join(DATA_DIR, 'metadata.json')
+
     if not os.path.exists(metadata_file):
         raise AirflowException(f"Metadata file not found: {metadata_file}")
+    
     with open(metadata_file, 'r') as f:
         metadata = json.load(f)
+
     if not isinstance(metadata, list) or not all(isinstance(item, dict) for item in metadata):
         raise AirflowException("Invalid metadata format. Expected a list of dictionaries.")
+    
     required_keys = ['chain', 'slug', 'metric', 'start_date', 'end_date']
     if not all(all(key in item for key in required_keys) for item in metadata):
         raise AirflowException(f"Invalid metadata format. Each item should contain keys: {required_keys}")
 
 def validate_raw_files():
     raw_dir = os.path.join(DATA_DIR, 'raw')
+
     if not os.path.exists(raw_dir):
         raise AirflowException(f"Raw data directory not found: {raw_dir}")
     
@@ -185,12 +285,15 @@ def validate_raw_files():
     valid_blockchains = []
     for blockchain_slug, blockchain_name in blockchains_to_validate:
         is_valid = True
+
         for metric in METRICS:
             raw_file = os.path.join(raw_dir, f'{blockchain_slug}_{metric}_raw.json')
+
             if not os.path.exists(raw_file):
                 print(f"Raw file not found for {blockchain_name}: {raw_file}")
                 is_valid = False
                 break
+
             try:
                 with open(raw_file, 'r') as f:
                     data = json.load(f)
@@ -198,6 +301,7 @@ def validate_raw_files():
                     print(f"Invalid format in {raw_file} for {blockchain_name}")
                     is_valid = False
                     break
+
             except Exception as e:
                 print(f"Error reading raw file for {blockchain_name}: {str(e)}")
                 is_valid = False
@@ -208,54 +312,19 @@ def validate_raw_files():
     
     return valid_blockchains
 
-def validate_curated_files(blockchains_to_validate):
-    curated_dir = os.path.join(DATA_DIR, 'curated')
-    if not os.path.exists(curated_dir):
-        raise AirflowException(f"Curated data directory not found: {curated_dir}")
-    
-    valid_blockchains = []
-    columns_to_check = ['date'] + METRICS
-    
-    for blockchain_name in blockchains_to_validate:
-        try:
-            curated_file = os.path.join(curated_dir, f'{blockchain_name}_staking_curated.json')
-            if not os.path.exists(curated_file):
-                print(f"Curated file not found: {curated_file}")
-                continue
-                
-            df = pd.read_json(curated_file)
-            
-            if not all(col in df.columns for col in columns_to_check):
-                print(f"Invalid format in {curated_file}. Expected columns: {', '.join(columns_to_check)}. Got columns: {', '.join(df.columns)}")
-                continue
-            
-            valid_blockchains.append(blockchain_name)
-            print(f"Validated curated file for {blockchain_name}")
-            
-        except Exception as e:
-            print(f"Error validating curated file for {blockchain_name}: {str(e)}")
-            continue
-    
-    return valid_blockchains
-
 # Task functions
 def fetch_metadata(**kwargs):
     try:
-        validate_latest_dates_file()
+        validate_latest_dune_dates_file()
         
         api_key = load_api_key("api_key_staking_rewards")
         if not api_key:
             raise ValueError("Staking Rewards API key not found")
         
-        latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
-        latest_dates_df = pd.read_csv(latest_dates_file)
-        print(f"Read latest dates from {latest_dates_file}")
-        print(f"Latest dates DataFrame: {latest_dates_df.to_dict('records')}")
-        
-        latest_dates_df = latest_dates_df.set_index('table_name')
+        latest_dates = parse_latest_dates(0)
+        start_dates_df = latest_dates['min_of_max_dates']
 
         metadata = []
-        # Use global DEV_MODE
         blockchains_to_process = list(BLOCKCHAINS.items())[:1] if DEV_MODE else BLOCKCHAINS.items()
         metrics_to_process = METRICS
 
@@ -264,19 +333,21 @@ def fetch_metadata(**kwargs):
                 print(f"Processing {blockchain_name} - {metric}")
                 
                 table_name = f"{blockchain_name}_staking"
+                start_date = start_dates_df.loc[table_name] if table_name in start_dates_df.index else None
+                end_date = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
                 
-                start_date = latest_dates_df.loc[table_name, 'max_date'] if table_name in latest_dates_df.index else None
+                days_since_start = (datetime.now() - start_date).days
                 
-                print(f"Start date: {start_date} for {blockchain_name} - {metric}")
-                start_date = datetime.strptime(start_date, '%Y-%m-%d') + timedelta(days=1)
-                start_date = start_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+                if days_since_start < 2: # Allow Staking Rewards to catch up
+                    print(f"Skipping {blockchain_name} - {metric}: Start date {start_date} is too recent")
+                    continue
 
-                end_date = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')  # Allow Staking Rewards to catch up
+                start_timestamp = f"{start_date.strftime('%Y-%m-%d')}T00:00:00Z"
 
                 query = f"""
                 {{
                   earliest: assets(where: {{slugs: ["{blockchain_slug}"]}}, limit: 1) {{
-                    metrics(where: {{metricKeys: ["{metric}"], createdAt_gt: "{start_date}"}}, limit: 1, order: {{createdAt: asc}}) {{
+                    metrics(where: {{metricKeys: ["{metric}"], createdAt_gt: "{start_timestamp}"}}, limit: 1, order: {{createdAt: asc}}) {{
                       createdAt
                     }}
                   }}
@@ -317,7 +388,7 @@ def fetch_metadata(**kwargs):
                         'chain': blockchain_name,
                         'slug': blockchain_slug,
                         'metric': metric,
-                        'start_date': earliest_date or start_date,
+                        'start_date': earliest_date or start_timestamp,
                         'end_date': latest_date or end_date,
                     })      
                 else:
@@ -327,14 +398,16 @@ def fetch_metadata(**kwargs):
         # Save metadata to file
         ensure_dir(DATA_DIR)
         metadata_file = os.path.join(DATA_DIR, 'metadata.json')
+
+        if DEV_MODE:
+            print(f"Metadata: {metadata}")
+
         with open(metadata_file, 'w') as f:
             json.dump(metadata, f)
+
         print(f"Saved metadata to {metadata_file}")
-        
         validate_metadata_file()
-    except AirflowException as e:
-        print(f"AirflowException: {e}")
-        raise
+
     except Exception as e:
         raise AirflowException(f"Error in fetch_metadata: {e}")
     
@@ -444,13 +517,18 @@ def fetch_metrics(**kwargs):
 def process_metrics(**kwargs):
     try:
         print("Starting process_metrics function")
+
         valid_blockchains = validate_raw_files()
         if not valid_blockchains:
             raise AirflowException("No valid raw files found for any blockchain")
         
         print(f"Processing valid blockchains: {valid_blockchains}")
         processed_blockchains = []
-        
+
+        latest_dates = parse_latest_dates(0)
+        dune_dates = latest_dates['dune_date']
+        rds_dates = latest_dates['rds_date']
+
         # Read raw data and convert to CSV format
         raw_dir = os.path.join(DATA_DIR, 'raw')
         curated_dir = os.path.join(DATA_DIR, 'curated')
@@ -464,16 +542,24 @@ def process_metrics(**kwargs):
                 csv_data = {}
                 for metric in METRICS:
                     raw_file = os.path.join(raw_dir, f'{blockchain_slug}_{metric}_raw.json')
-                    print(f"  Checking raw file: {raw_file}")
                     with open(raw_file, 'r') as f:
                         data = json.load(f)
-                    print(f"    Loaded {len(data)} data points for {metric}")
+                    print(f"Loaded {len(data)} data points for {metric} from file {raw_file}")
                     
                     for item in data:
                         date = item['createdAt'].split('T')[0]
                         if date not in csv_data:
                             csv_data[date] = {m: 0 for m in METRICS}
                         csv_data[date][metric] = float(item['defaultValue'])
+
+                # Filter out dates less than 2 days ago
+                two_days_ago = datetime.now().date() - timedelta(days=2)
+                csv_data = {date: values for date, values in csv_data.items() 
+                           if datetime.strptime(date, '%Y-%m-%d').date() <= two_days_ago}
+                
+                if not csv_data:
+                    print(f"No data points found before {two_days_ago} for {blockchain_name}")
+                    continue
                 
                 # Convert to DataFrame
                 print(f"Creating DataFrame for {blockchain_name}")
@@ -484,31 +570,27 @@ def process_metrics(**kwargs):
                 # Ensure all expected columns are present
                 for metric in METRICS:
                     if metric not in df.columns:
-                        print(f"  Adding missing column: {metric}")
+                        print(f"Filling missing column with 0: {metric}")
                         df[metric] = 0
-                
-                # Save curated file
-                curated_file = os.path.join(curated_dir, f'{blockchain_name}_staking_curated.json')
-                df.to_json(curated_file, orient='records')
-                print(f"Saved curated data to {curated_file}")
-                
+
+                df_dune = df[df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d') > dune_dates.loc[blockchain_name + '_staking'])].copy()
+                df_rds = df[df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d') > rds_dates.loc[blockchain_name + '_staking'])].copy()
+
+                df_dune.to_csv(os.path.join(curated_dir, f'{blockchain_name}_staking_curated_dune.csv'), index=False)
+                df_rds.to_csv(os.path.join(curated_dir, f'{blockchain_name}_staking_curated_rds.csv'), index=False)
+
+                print(f"Processed {blockchain_name} with {len(df_dune)} rows for Dune and {len(df_rds)} rows for RDS")
                 processed_blockchains.append(blockchain_name)
                 
             except Exception as e:
-                print(f"Error processing {blockchain_name}: {str(e)}")
-                continue
+                raise AirflowException(f"Error processing {blockchain_name}: {e}")
         
         if not processed_blockchains:
             raise AirflowException("No blockchains were successfully processed")
         
-        # Validate only the processed blockchains
-        valid_curated = validate_curated_files(processed_blockchains)
-        if not valid_curated:
-            raise AirflowException("No valid curated files were created")
-        
-        print(f"Successfully processed blockchains: {valid_curated}")
-        kwargs['task_instance'].xcom_push(key='processed_blockchains', value=valid_curated)
-        return valid_curated
+        print(f"Successfully processed blockchains: {processed_blockchains}")
+        kwargs['task_instance'].xcom_push(key='processed_blockchains', value=processed_blockchains)
+        return processed_blockchains
         
     except Exception as e:
         print(f"Error in process_metrics: {str(e)}")
@@ -517,30 +599,20 @@ def process_metrics(**kwargs):
 def upload_to_dune(**kwargs):
     try:
         # Get the list of successfully processed blockchains from the previous task
-        processed_blockchains = kwargs['task_instance'].xcom_pull(task_ids='convert_to_csv', key='processed_blockchains')
+        processed_blockchains = kwargs['task_instance'].xcom_pull(task_ids='process_metrics', key='processed_blockchains')
         if not processed_blockchains:
             raise AirflowException("No processed blockchains data available from previous task")
-        
-        # Validate only the processed blockchains
-        valid_blockchains = validate_curated_files(processed_blockchains)
-        if not valid_blockchains:
-            raise AirflowException("No valid curated files found for upload")
         
         csv_dir = os.path.join(DATA_DIR, 'csv')
         ensure_dir(csv_dir)
         curated_dir = os.path.join(DATA_DIR, 'curated')
         
         uploaded_blockchains = []
-        for blockchain_name in valid_blockchains:
+        for blockchain_name in processed_blockchains:
             try:
-                curated_file = os.path.join(curated_dir, f'{blockchain_name}_staking_curated.json')
-                df = pd.read_json(curated_file)
+                csv_file = os.path.join(curated_dir, f'{blockchain_name}_staking_curated_dune.csv')
+                df = pd.read_csv(csv_file)
                 table_name = f"{blockchain_name}_staking"
-                
-                # Save final CSV to file
-                csv_path = os.path.join(csv_dir, f'{table_name}.csv')
-                df.to_csv(csv_path, index=False)
-                print(f"Saved CSV to {csv_path}")
 
                 if DO_NOT_UPLOAD:
                     print(f"\nDO NOT UPLOAD: Data to be uploaded for {blockchain_name}:")
@@ -562,6 +634,44 @@ def upload_to_dune(**kwargs):
         
     except Exception as e:
         raise AirflowException(f"Error in upload_to_dune: {e}")
+    
+def upload_to_rds(**kwargs):
+    try:
+        # Get the list of successfully processed blockchains from the previous task
+        processed_blockchains = kwargs['task_instance'].xcom_pull(task_ids='process_metrics', key='processed_blockchains')
+        if not processed_blockchains:
+            raise AirflowException("No processed blockchains data available from previous task")
+        
+        curated_dir = os.path.join(DATA_DIR, 'curated')
+        ensure_dir(curated_dir)
+
+        for blockchain_name in processed_blockchains:
+            csv_file = os.path.join(curated_dir, f"{blockchain_name}_staking_curated_rds.csv")
+            
+            if not os.path.exists(csv_file):
+                raise AirflowException(f"CSV file not found for {blockchain_name}: {csv_file}")
+                
+            df = pd.read_csv(csv_file)
+            table_name = f"{blockchain_name}_staking"
+            
+            if DO_NOT_UPLOAD:
+                print(f"\nDO NOT UPLOAD: Data to be uploaded to RDS for {blockchain_name}:")
+                print(df.to_string())
+                print(f"Total rows: {len(df)}")
+                continue
+
+            df.to_sql(
+                table_name,
+                rds_engine,
+                if_exists='append', 
+                index=False,
+                method='multi',
+                chunksize=1000
+            )
+            print(f"Successfully uploaded {len(df)} rows to RDS table {table_name}")
+            
+    except Exception as e:
+        raise AirflowException(f"Error in upload_to_rds: {e}")
 
 # DAG definition
 default_args = {
@@ -582,9 +692,15 @@ dag = DAG(
     catchup=False
 )
 
-get_latest_dates_task = PythonOperator(
-    task_id='get_latest_dates',
+fetch_dune_table_dates_task = PythonOperator(
+    task_id='get_latest_dune_dates',
     python_callable=fetch_dune_table_dates,
+    dag=dag,
+)
+
+fetch_rds_table_dates_task = PythonOperator(
+    task_id='get_latest_rds_dates',
+    python_callable=fetch_rds_table_dates,
     dag=dag,
 )
 
@@ -600,8 +716,8 @@ fetch_metrics_task = PythonOperator(
     dag=dag,
 )
 
-convert_to_csv_task = PythonOperator(
-    task_id='convert_to_csv',
+process_metrics_task = PythonOperator(
+    task_id='process_metrics',
     python_callable=process_metrics,
     dag=dag,
 )
@@ -612,6 +728,12 @@ upload_to_dune_task = PythonOperator(
     dag=dag,
 )
 
+upload_to_rds_task = PythonOperator(
+    task_id='upload_to_rds',
+    python_callable=upload_to_rds,
+    dag=dag,
+)
+
 # Set up task dependencies
-get_latest_dates_task >> fetch_metadata_task >> fetch_metrics_task >> convert_to_csv_task >> upload_to_dune_task
+[fetch_dune_table_dates_task, fetch_rds_table_dates_task] >> fetch_metadata_task >> fetch_metrics_task >> process_metrics_task >> [upload_to_dune_task, upload_to_rds_task]
 

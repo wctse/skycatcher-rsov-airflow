@@ -2,6 +2,8 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 from airflow.exceptions import AirflowException
+from airflow.hooks.base import BaseHook
+from sqlalchemy import create_engine, text
 from datetime import datetime, timedelta
 import requests
 import json
@@ -27,6 +29,12 @@ QUERY_LIMIT = 200
 # Data directory
 DATA_DIR = '/tmp/taostats/subnet'
 SUBNET_HISTORY_DIR = os.path.join(DATA_DIR, 'subnet_history')
+TABLE_NAME = 'bittensor_subnets_stats'
+
+rds_conn = BaseHook.get_connection('rds_connection')
+rds_engine = create_engine(
+    f'postgresql://{rds_conn.login}:{rds_conn.password}@{rds_conn.host}:{rds_conn.port}/{rds_conn.schema}'
+)
 
 # Reused utility functions from existing DAGs
 def load_api_key(key_name):
@@ -102,20 +110,41 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616" if not DEV_MODE else "4226299"
+            query_id="4170616" #"4170616" if not DEV_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
         print(f"Output from fetch_dune_table_dates: {df.to_dict('records')}")
         
         ensure_dir(DATA_DIR)
-        file_path = os.path.join(DATA_DIR, 'latest_dates.csv')
+        file_path = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
         df.to_csv(file_path, index=False)
         print(f"Saved latest dates to {file_path}")
         
-        validate_latest_dates_file()
+        validate_latest_dune_dates_file()
     except Exception as e:
         raise AirflowException(f"Error in fetch_dune_table_dates: {e}")
+    
+def fetch_rds_table_dates(**kwargs):
+    try:        
+        query = text(f"""
+            SELECT '{TABLE_NAME}' as table_name, MAX(date) as max_date 
+            FROM {TABLE_NAME}
+        """)
+        
+        df = pd.read_sql(query, rds_engine)
+        
+        # Save RDS dates to a separate file
+        ensure_dir(DATA_DIR)
+        file_path = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+        df.to_csv(file_path, index=False)
+        print(f"Saved RDS dates to {file_path}")
+        print(f"Latest RDS dates: {df.to_string()}")
+        
+        validate_latest_rds_dates_file()
+
+    except Exception as e:
+        raise AirflowException(f"Error in fetch_rds_table_dates: {e}")
 
 def insert_df_to_dune(df, table_name):
     try:
@@ -135,24 +164,77 @@ def insert_df_to_dune(df, table_name):
         return response
     except Exception as e:
         raise AirflowException(f"Error in insert_df_to_dune: {e}")
+    
+def parse_latest_dates(delta=0):
+    validate_latest_dune_dates_file()
+    latest_dune_dates_file = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
+    latest_dune_dates_df = pd.read_csv(latest_dune_dates_file)
+
+    validate_latest_rds_dates_file()
+    latest_rds_dates_file = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+    latest_rds_dates_df = pd.read_csv(latest_rds_dates_file)
+
+    dune_date = latest_dune_dates_df.loc[
+        latest_dune_dates_df['table_name'] == TABLE_NAME,
+        'max_date'
+    ].iloc[0]
+
+    rds_date = latest_rds_dates_df.loc[
+        latest_rds_dates_df['table_name'] == TABLE_NAME,
+        'max_date'
+    ].iloc[0]
+
+    # Convert string dates to datetime objects for comparison
+    dune_date = datetime.strptime(dune_date, '%Y-%m-%d') + timedelta(days=delta)
+    rds_date = datetime.strptime(rds_date, '%Y-%m-%d') + timedelta(days=delta)
+
+    print(f"Dune date: {dune_date}")
+    print(f"RDS date: {rds_date}")
+    
+    # Get the earliest date to ensure we don't miss any data
+    min_of_max_dates = min(dune_date, rds_date)
+
+    return {
+        'dune_date': dune_date,
+        'rds_date': rds_date,
+        'min_of_max_dates': min_of_max_dates
+    }
 
 # Validation functions
-def validate_latest_dates_file():
-    latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
-    if not os.path.exists(latest_dates_file):
-        raise AirflowException(f"Latest dates file not found: {latest_dates_file}")
-    df = pd.read_csv(latest_dates_file)
+def validate_latest_dune_dates_file():
+    latest_dune_dates_file = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
+
+    if not os.path.exists(latest_dune_dates_file):
+        raise AirflowException(f"Latest dates file not found: {latest_dune_dates_file}")
+    
+    df = pd.read_csv(latest_dune_dates_file)
+
     if not all(col in df.columns for col in ['table_name', 'max_date']):
-        raise AirflowException(f"Invalid format in latest_dates.csv. Expected columns: table_name, max_date")
+        raise AirflowException(f"Invalid format in latest_dune_dates.csv. Expected columns: table_name, max_date")
+    
+def validate_latest_rds_dates_file():
+    latest_rds_dates_file = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+
+    if not os.path.exists(latest_rds_dates_file):
+        raise AirflowException(f"Latest dates file not found: {latest_rds_dates_file}")
+    
+    df = pd.read_csv(latest_rds_dates_file)
+
+    if not all(col in df.columns for col in ['table_name', 'max_date']):
+        raise AirflowException(f"Invalid format in latest_rds_dates.csv. Expected columns: table_name, max_date")
 
 def validate_subnet_list_file():
     subnet_list_file = os.path.join(DATA_DIR, 'subnet_list.json')
+
     if not os.path.exists(subnet_list_file):
         raise AirflowException(f"Subnet list file not found: {subnet_list_file}")
+    
     with open(subnet_list_file, 'r') as f:
         data = json.load(f)
+
     if not isinstance(data, dict) or 'data' not in data:
         raise AirflowException("Invalid subnet list format. Expected object with 'data' array.")
+    
     if not isinstance(data['data'], list):
         raise AirflowException("Invalid subnet list format. 'data' should be an array.")
 
@@ -238,10 +320,11 @@ def parse_timestamp(timestamp_str, timestamp_formats, return_datetime=False):
     
     for fmt in timestamp_formats:
         try:
+            timestamp_str = str(timestamp_str).strip()
             if return_datetime:
-                return datetime.strptime(timestamp_str.strip(), fmt)
+                return datetime.strptime(timestamp_str, fmt)
             else:
-                return int(datetime.strptime(timestamp_str.strip(), fmt).timestamp())
+                return int(datetime.strptime(timestamp_str, fmt).timestamp())
         
         except ValueError:
             continue
@@ -263,15 +346,11 @@ def fetch_subnet_histories(**kwargs):
 
         ensure_dir(SUBNET_HISTORY_DIR)
         
-        latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
-        latest_dates_df = pd.read_csv(latest_dates_file)
-        latest_date = latest_dates_df.loc[
-            latest_dates_df['table_name'] == 'bittensor_subnets_stats', 
-            'max_date'
-        ].iloc[0]
+        latest_dates = parse_latest_dates(0)
+        start_date = (latest_dates['min_of_max_dates'])
         
         # Format the start date to include time component
-        start_timestamp = parse_timestamp(latest_date, "%Y-%m-%d")
+        start_timestamp = parse_timestamp(start_date, "%Y-%m-%d %H:%M:%S")
         timestamp_formats = ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ']
         
         subnets_to_process = subnet_data['data'] if not DEV_MODE else subnet_data['data'][:2]
@@ -281,6 +360,10 @@ def fetch_subnet_histories(**kwargs):
             print(f"Processing subnet {netuid}")
             
             file_path = os.path.join(SUBNET_HISTORY_DIR, f'subnet_{netuid}.json')
+            # Clear the file contents but keep the file
+            with open(file_path, 'w') as f:
+                json.dump([], f)
+                print(f"Cleared contents of {file_path}")
             
             new_history_data = []
             current_start = start_timestamp
@@ -316,9 +399,10 @@ def fetch_subnet_histories(**kwargs):
                 json.dump(new_history_data, f, indent=2)
             
             # Print latest dates for comparison
-            latest_dune_date = parse_timestamp(latest_date, "%Y-%m-%d", return_datetime=True)
             latest_fetched_date = parse_timestamp(new_items[-1]['timestamp'], timestamp_formats, return_datetime=True) if new_history_data else 'No data'
-            print(f"Latest date in Dune: {latest_dune_date}")
+
+            print(f"Latest date in Dune: {latest_dates['dune_date']}")
+            print(f"Latest date in RDS: {latest_dates['rds_date']}")
             print(f"Latest date in fetched data: {latest_fetched_date}")
             print(f"Saved {len(new_history_data)} new records for subnet {netuid}")
             
@@ -330,6 +414,8 @@ def fetch_subnet_histories(**kwargs):
 
 def fetch_dune_baseline_values(**kwargs):
     try:
+        print("Fetching baseline values from Dune")
+
         api_key = load_api_key("api_key_dune")
         if not api_key:
             raise ValueError("Dune API key not found")
@@ -357,12 +443,43 @@ def fetch_dune_baseline_values(**kwargs):
             'total_recycled': float(df['total_recycled'].iloc[0])
         }
     except Exception as e:
-        raise AirflowException(f"Error fetching baseline values: {e}")
+        raise AirflowException(f"Error fetching Dune baseline values: {e}")
+    
+def fetch_rds_baseline_values(**kwargs):
+    try:
+        print("Fetching baseline values from RDS")
+
+        query = text(f"""
+            SELECT *
+            FROM {TABLE_NAME}
+            WHERE date = (
+                SELECT MAX(date)
+                FROM {TABLE_NAME}
+            )
+        """)
+
+        df = pd.read_sql(query, rds_engine)
+        
+        if df.empty:
+            raise AirflowException("No baseline values found in RDS")
+            
+        print(f"Retrieved baseline values from RDS for date: {df['date'].iloc[0]}")
+        print(f"Baseline cumulative_subnet_0_recycled: {df['cumulative_subnet_0_recycled'].iloc[0]}")
+        print(f"Baseline other_subnets_recycled: {df['other_subnets_recycled'].iloc[0]}")
+        print(f"Baseline total_recycled: {df['total_recycled'].iloc[0]}")
+        
+        return {
+            'baseline_date': df['date'].iloc[0],
+            'cumulative_subnet_0_recycled': float(df['cumulative_subnet_0_recycled'].iloc[0]),
+            'other_subnets_recycled': float(df['other_subnets_recycled'].iloc[0]),
+            'total_recycled': float(df['total_recycled'].iloc[0])
+        }
+    except Exception as e:
+        raise AirflowException(f"Error fetching RDS baseline values: {e}")
 
 def process_subnet_data(**kwargs):
     try:
         print("Starting process_subnet_data")
-        print(f"Running in {'DEV' if DEV_MODE else 'PRODUCTION'} mode")
 
         # Step 1: Check required directories and files exist
         required_dirs = [DATA_DIR, SUBNET_HISTORY_DIR]
@@ -378,14 +495,14 @@ def process_subnet_data(**kwargs):
             if not os.path.exists(file_path):
                 raise AirflowException(f"Required file not found: {file_path}")
 
-        validate_latest_dates_file()
-        print("Validated latest dates file")
-
         # Step 3: Fetch baseline values from Dune
-        print("Fetching baseline values from Dune...")
-        baseline = fetch_dune_baseline_values()
-        baseline_date = datetime.strptime(baseline['baseline_date'], '%Y-%m-%d').date()
-        print(f"Using baseline date: {baseline_date}")
+        baseline_dune = fetch_dune_baseline_values()
+        baseline_date_dune = datetime.strptime(baseline_dune['baseline_date'], '%Y-%m-%d').date()
+        print(f"Using baseline date from Dune: {baseline_date_dune}")
+        
+        baseline_rds = fetch_rds_baseline_values()
+        baseline_date_rds = datetime.strptime(baseline_rds['baseline_date'], '%Y-%m-%d').date()
+        print(f"Using baseline date from RDS: {baseline_date_rds}")
         
         # Step 4: Load subnet list and determine which subnets to process
         subnet_list_file = os.path.join(DATA_DIR, 'subnet_list.json')
@@ -400,154 +517,155 @@ def process_subnet_data(**kwargs):
         # Constants
         ISSUED_VALUE = 7200
         
-        # Step 5: Initialize with baseline values
-        cumulative_subnet_0_recycled = baseline['cumulative_subnet_0_recycled']
-        previous_other_subnets_recycled = baseline['other_subnets_recycled']
-        
-        print(f"Starting calculations from baseline values:")
-        print(f"Initial cumulative_subnet_0_recycled: {cumulative_subnet_0_recycled}")
-        print(f"Initial other_subnets_recycled: {previous_other_subnets_recycled}")
-        
-        # Step 6: Process Subnet 0
-        print("Processing Subnet 0...")
-        subnet_0_data = {}
-        subnet_0_file = os.path.join(SUBNET_HISTORY_DIR, 'subnet_0.json')
-        with open(subnet_0_file, 'r') as f:
-            subnet_0_history = json.load(f)
+        # Step 5: Process data for both Dune and RDS
+        for target in ['dune', 'rds']:
+            print(f"\nProcessing data for {target.upper()}...")
             
-        for entry in subnet_0_history:
-            date = adjust_date(entry['timestamp'])
-            entry_date = datetime.strptime(date, '%Y-%m-%d').date()
-            if entry_date <= baseline_date:
-                continue
-            if date not in subnet_0_data:
-                subnet_0_data[date] = float(entry['emission']) / 1e9
-        
-        print(f"Processed {len(subnet_0_data)} days of Subnet 0 data")
-        
-        # Step 7: Process other subnets
-        print("Processing other subnets...")
-        other_subnets_recycled_by_date = {}
-        
-        for netuid in netuids:
-            if netuid == 0:
-                continue
+            # Get appropriate baseline values
+            baseline = baseline_dune if target == 'dune' else baseline_rds
+            baseline_date = baseline_date_dune if target == 'dune' else baseline_date_rds
+            
+            # Initialize with baseline values
+            cumulative_subnet_0_recycled = baseline['cumulative_subnet_0_recycled']
+            previous_other_subnets_recycled = baseline['other_subnets_recycled']
+            
+            print(f"Starting calculations from {target} baseline values:")
+            print(f"Initial cumulative_subnet_0_recycled: {cumulative_subnet_0_recycled}")
+            print(f"Initial other_subnets_recycled: {previous_other_subnets_recycled}")
+            
+            # Step 6: Process Subnet 0
+            print("Processing Subnet 0...")
+            subnet_0_data = {}
+            subnet_0_file = os.path.join(SUBNET_HISTORY_DIR, 'subnet_0.json')
+            with open(subnet_0_file, 'r') as f:
+                subnet_0_history = json.load(f)
                 
-            print(f"Processing subnet {netuid}")
-            subnet_file = os.path.join(SUBNET_HISTORY_DIR, f'subnet_{netuid}.json')
-            with open(subnet_file, 'r') as f:
-                subnet_history = json.load(f)
-            
-            # Sort by timestamp to ensure chronological order
-            subnet_history.sort(key=lambda x: x['timestamp'])
-            
-            for entry in subnet_history:
-                entry_date = datetime.strptime(adjust_date(entry['timestamp']), '%Y-%m-%d').date()
-                if entry_date <= baseline_date:
-                    continue
-                
+            for entry in subnet_0_history:
                 date = adjust_date(entry['timestamp'])
-                recycled = float(entry['recycled_lifetime']) / 1e9
+                entry_date = datetime.strptime(date, '%Y-%m-%d').date()
+                print(f"Processing date: {date}, baseline date: {baseline_date}")
+
+                if entry_date <= baseline_date:
+                    print(f"Skipping date {date} because it is before the baseline date {baseline_date}")
+                    continue
+
+                if date not in subnet_0_data:
+                    subnet_0_data[date] = float(entry['emission']) / 1e9
+            
+            print(f"Processed {len(subnet_0_data)} days of Subnet 0 data")
+            
+            # Step 7: Process other subnets
+            other_subnets_recycled_by_date = {}
+            
+            for netuid in netuids:
+                if netuid == 0:
+                    continue
+                    
+                print(f"Processing subnet {netuid}")
+                subnet_file = os.path.join(SUBNET_HISTORY_DIR, f'subnet_{netuid}.json')
+                with open(subnet_file, 'r') as f:
+                    subnet_history = json.load(f)
                 
-                if date not in other_subnets_recycled_by_date:
-                    other_subnets_recycled_by_date[date] = 0
-                other_subnets_recycled_by_date[date] += recycled
-        
-        # Step 8: Combine all data
-        all_dates = sorted(set(list(subnet_0_data.keys()) + list(other_subnets_recycled_by_date.keys())))
-        print(f"Total unique dates to process: {len(all_dates)}")
-        
-        # Remove the latest date to avoid premature values
-        if all_dates:
-            latest_date = all_dates[-1]
-            print(f"Removing latest date {latest_date} to avoid premature values")
-            all_dates = all_dates[:-1]
-        
-        # Step 9: Verify continuity
-        if all_dates:
-            first_new_date = datetime.strptime(all_dates[0], '%Y-%m-%d').date()
-            date_gap = (first_new_date - baseline_date).days
-            if date_gap > 1:
-                raise AirflowException(f"Gap detected between baseline date {baseline_date} and first new date {first_new_date}")
-            print(f"Data continuity verified. First new date: {first_new_date}")
-        
-        # Step 10: Generate final data
-        # Step 10: Generate final data
-        print("Generating final data...")
-        final_data = []
-        
-        # Initialize with baseline values but don't include them in calculations
-        # These are the values as of the baseline date
-        cumulative_subnet_0_recycled = baseline['cumulative_subnet_0_recycled']
-        previous_other_subnets_recycled = baseline['other_subnets_recycled']
-        
-        print("Starting values from baseline:")
-        print(f"cumulative_subnet_0_recycled: {cumulative_subnet_0_recycled}")
-        print(f"previous_other_subnets_recycled: {previous_other_subnets_recycled}")
-        
-        for date in all_dates:
-            subnet_0_emission = subnet_0_data.get(date, 0)
-            subnet_0_recycled = ISSUED_VALUE * subnet_0_emission
+                # Sort by timestamp to ensure chronological order
+                subnet_history.sort(key=lambda x: x['timestamp'])
+                
+                for entry in subnet_history:
+                    entry_date = datetime.strptime(adjust_date(entry['timestamp']), '%Y-%m-%d').date()
+                    print(f"Processing date: {entry_date}, baseline date: {baseline_date}")
+                    if entry_date <= baseline_date:
+                        continue
+                    
+                    date = adjust_date(entry['timestamp'])
+                    recycled = float(entry['recycled_lifetime']) / 1e9
+                    
+                    if date not in other_subnets_recycled_by_date:
+                        other_subnets_recycled_by_date[date] = 0
+                    other_subnets_recycled_by_date[date] += recycled
             
-            # Add subnet_0_recycled to the cumulative amount AFTER using it for calculations
-            cumulative_subnet_0_recycled += subnet_0_recycled
+            # Step 8: Combine all data
+            all_dates = sorted(set(list(subnet_0_data.keys()) + list(other_subnets_recycled_by_date.keys())))
+            print(f"Total unique dates to process: {len(all_dates)}")
             
-            # Get the current total recycled amount for other subnets
-            current_other_subnets_recycled = other_subnets_recycled_by_date.get(date, 0)
+            # Remove the latest date to avoid premature values
+            if all_dates:
+                latest_date = all_dates[-1]
+                print(f"Removing latest date {latest_date} to avoid premature values")
+                all_dates = all_dates[:-1]
             
-            # Calculate daily change in other subnets recycled
-            daily_other_subnets_recycled = current_other_subnets_recycled - previous_other_subnets_recycled
+            # Step 9: Verify continuity
+            if all_dates:
+                first_new_date = datetime.strptime(all_dates[0], '%Y-%m-%d').date()
+                date_gap = (first_new_date - baseline_date).days
+                if date_gap > 1:
+                    raise AirflowException(f"Gap detected between baseline date {baseline_date} and first new date {first_new_date}")
+                print(f"Data continuity verified. First new date: {first_new_date}")
             
-            # Calculate total recycled using CURRENT cumulative values
-            total_recycled = cumulative_subnet_0_recycled + current_other_subnets_recycled
+            # Step 10: Generate final data
+            print("Generating final data...")
+            final_data = []
             
-            # Append data for this date
-            final_data.append({
-                'date': date,
-                'issued': ISSUED_VALUE,
-                'daily_issued': ISSUED_VALUE,
-                'subnet_0_emission': subnet_0_emission,
-                'subnet_0_recycled': subnet_0_recycled,
-                'cumulative_subnet_0_recycled': cumulative_subnet_0_recycled,
-                'daily_other_subnets_recycled': daily_other_subnets_recycled,
-                'other_subnets_recycled': current_other_subnets_recycled,
-                'total_recycled': total_recycled
-            })
+            # Initialize with baseline values but don't include them in calculations
+            # These are the values as of the baseline date
+            cumulative_subnet_0_recycled = baseline['cumulative_subnet_0_recycled']
+            previous_other_subnets_recycled = baseline['other_subnets_recycled']
             
-            # Update the previous value AFTER using it for calculations
-            previous_other_subnets_recycled = current_other_subnets_recycled
+            print("Starting values from baseline:")
+            print(f"cumulative_subnet_0_recycled: {cumulative_subnet_0_recycled}")
+            print(f"previous_other_subnets_recycled: {previous_other_subnets_recycled}")
             
-            if DEV_MODE and len(final_data) <= 5:
-                print(f"\nProcessed date: {date}")
-                print(f"subnet_0_emission: {subnet_0_emission}")
-                print(f"subnet_0_recycled: {subnet_0_recycled}")
-                print(f"cumulative_subnet_0_recycled: {cumulative_subnet_0_recycled}")
-                print(f"current_other_subnets_recycled: {current_other_subnets_recycled}")
-                print(f"daily_other_subnets_recycled: {daily_other_subnets_recycled}")
-                print(f"total_recycled: {total_recycled}")
-        
-        # Convert to DataFrame and save
-        df = pd.DataFrame(final_data)
-        
-        if DEV_MODE:
-            print("\nProcessed Data Summary:")
-            print("\nFirst few rows:")
-            print(df.head())
-            print("\nValue ranges:")
-            print(df.describe())
-            print("\nMin values:")
-            print(df.min())
-            print("\nMax values:")
-            print(df.max())
-        
-        # Save processed data
-        processed_dir = os.path.join(DATA_DIR, 'processed')
-        ensure_dir(processed_dir)
-        processed_file = os.path.join(processed_dir, 'subnet_summary.csv')
-        df.to_csv(processed_file, index=False)
-        print(f"Saved processed data to {processed_file}")
-        
-        return df
+            for date in all_dates:
+                subnet_0_emission = subnet_0_data.get(date, 0)
+                subnet_0_recycled = ISSUED_VALUE * subnet_0_emission
+                
+                # Add subnet_0_recycled to the cumulative amount AFTER using it for calculations
+                cumulative_subnet_0_recycled += subnet_0_recycled
+                
+                # Get the current total recycled amount for other subnets
+                current_other_subnets_recycled = other_subnets_recycled_by_date.get(date, 0)
+                
+                # Calculate daily change in other subnets recycled
+                daily_other_subnets_recycled = current_other_subnets_recycled - previous_other_subnets_recycled
+                
+                # Calculate total recycled using CURRENT cumulative values
+                total_recycled = cumulative_subnet_0_recycled + current_other_subnets_recycled
+                
+                # Append data for this date
+                final_data.append({
+                    'date': date,
+                    'issued': ISSUED_VALUE,
+                    'daily_issued': ISSUED_VALUE,
+                    'subnet_0_emission': subnet_0_emission,
+                    'subnet_0_recycled': subnet_0_recycled,
+                    'cumulative_subnet_0_recycled': cumulative_subnet_0_recycled,
+                    'daily_other_subnets_recycled': daily_other_subnets_recycled,
+                    'other_subnets_recycled': current_other_subnets_recycled,
+                    'total_recycled': total_recycled
+                })
+                
+                # Update the previous value AFTER using it for calculations
+                previous_other_subnets_recycled = current_other_subnets_recycled
+                
+                if DEV_MODE and len(final_data) <= 5:
+                    print(f"\nProcessed date: {date}")
+                    print(f"subnet_0_emission: {subnet_0_emission}")
+                    print(f"subnet_0_recycled: {subnet_0_recycled}")
+                    print(f"cumulative_subnet_0_recycled: {cumulative_subnet_0_recycled}")
+                    print(f"current_other_subnets_recycled: {current_other_subnets_recycled}")
+                    print(f"daily_other_subnets_recycled: {daily_other_subnets_recycled}")
+                    print(f"total_recycled: {total_recycled}")
+            
+            # Convert to DataFrame and save
+            df = pd.DataFrame(final_data)
+            
+            # Save processed data
+            ensure_dir(os.path.join(DATA_DIR, 'processed'))
+            processed_file = os.path.join(DATA_DIR, 'processed', f'subnet_summary_{target}.csv')
+
+            df.to_csv(processed_file, index=False)
+
+            print(f"Processed and saved {len(df)} records for {target}")
+            print(f"Head 3 rows: {df.head(3).to_string()}")
+            print(f"Tail 3 rows: {df.tail(3).to_string()}")
         
     except Exception as e:
         print(f"Error in process_subnet_data: {str(e)}")
@@ -555,8 +673,7 @@ def process_subnet_data(**kwargs):
 
 def upload_to_dune(**kwargs):
     try:
-        processed_dir = os.path.join(DATA_DIR, 'processed')
-        processed_file = os.path.join(processed_dir, 'subnet_summary.csv')
+        processed_file = os.path.join(DATA_DIR, 'processed', 'subnet_summary_dune.csv')
         
         if not os.path.exists(processed_file):
             raise AirflowException(f"Processed file not found: {processed_file}")
@@ -573,6 +690,34 @@ def upload_to_dune(**kwargs):
             
     except Exception as e:
         raise AirflowException(f"Error in upload_to_dune: {e}")
+    
+def upload_to_rds(**kwargs):
+    try:
+        processed_file = os.path.join(DATA_DIR, 'processed', 'subnet_summary_rds.csv')
+        
+        if not os.path.exists(processed_file):
+            raise AirflowException(f"Processed file not found: {processed_file}")
+            
+        df = pd.read_csv(processed_file)
+        
+        if DO_NOT_UPLOAD:
+            print("DO NOT UPLOAD: Data to be uploaded to RDS:")
+            print(df.to_string())
+            print(f"Total rows: {len(df)}")
+            return
+
+        df.to_sql(
+            TABLE_NAME,
+            rds_engine,
+            if_exists='append',
+            index=False,
+            method='multi',
+            chunksize=1000
+        )
+        print(f"Successfully uploaded {len(df)} rows to RDS table {TABLE_NAME}")
+            
+    except Exception as e:
+        raise AirflowException(f"Error in upload_to_rds: {e}")
 
 # Modify the DAG definition section at the bottom of the file
 default_args = {
@@ -593,9 +738,15 @@ dag = DAG(
     catchup=False
 )
 
-get_latest_dates_task = PythonOperator(
+get_latest_dune_dates_task = PythonOperator(
     task_id='get_latest_dates',
     python_callable=fetch_dune_table_dates,
+    dag=dag,
+)
+
+get_latest_rds_dates_task = PythonOperator(
+    task_id='get_latest_rds_dates',
+    python_callable=fetch_rds_table_dates,
     dag=dag,
 )
 
@@ -623,4 +774,10 @@ upload_to_dune_task = PythonOperator(
     dag=dag,
 )
 
-get_latest_dates_task >> fetch_subnet_list_task >> fetch_subnet_histories_task >> process_subnet_data_task >> upload_to_dune_task
+upload_to_rds_task = PythonOperator(
+    task_id='upload_to_rds',
+    python_callable=upload_to_rds,
+    dag=dag,
+)
+
+[get_latest_dune_dates_task, get_latest_rds_dates_task] >> fetch_subnet_list_task >> fetch_subnet_histories_task >> process_subnet_data_task >> [upload_to_dune_task, upload_to_rds_task]
