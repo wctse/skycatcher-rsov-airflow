@@ -2,6 +2,8 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 from airflow.exceptions import AirflowException
+from airflow.hooks.base import BaseHook
+from sqlalchemy import create_engine, text
 from datetime import datetime, timedelta
 import requests
 import json
@@ -19,13 +21,16 @@ import shutil
 DEV_MODE = False  # Set to False for production
 DO_NOT_UPLOAD = False
 
+rds_conn = BaseHook.get_connection('rds_connection')
+rds_engine = create_engine(
+    f'postgresql://{rds_conn.login}:{rds_conn.password}@{rds_conn.host}:{rds_conn.port}/{rds_conn.schema}'
+)
+
 upload_to_suffix = "" # use in testing
 
 # Configuration
 API_ENDPOINT = 'https://pro-api.llama.fi'
 
-# Data directory
-DATA_DIR = '/tmp/defillama'
 
 # Configuration JSONs
 TOKENS_CONFIG = {
@@ -334,6 +339,10 @@ INTERPOLATES = [
     }
 ]
 
+# Data directory
+DATA_DIR = '/tmp/defillama'
+TABLE_NAMES = [asset['name'] + '_collateral_value' for asset in ASSET_MAPPING.values()]
+
 # Utility functions
 def load_api_key(key_name):
     try:
@@ -400,7 +409,7 @@ def epoch_to_utc(timestamp):
             print(f"Invalid timestamp: {timestamp}")
             return None
         # Convert to UTC date string
-        return datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d')
+        return datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d') # TODO: Fix the deprecation of utcfromtimestamp
     except (ValueError, TypeError) as e:
         print(f"Error converting timestamp {timestamp}: {e}")
         return None
@@ -415,19 +424,44 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616" if not DEV_MODE else "4226299" # 4170616 for prod, 4226299 for test
+            query_id="4170616" # "4170616" if not DEV_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
         print(f"Output from fetch_dune_table_dates: {df.to_dict('records')}")
         
         ensure_dir(DATA_DIR)
-        file_path = os.path.join(DATA_DIR, 'latest_dates.csv')
+        file_path = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
         df.to_csv(file_path, index=False)
         print(f"Saved latest dates to {file_path}")
         
     except Exception as e:
         raise AirflowException(f"Error in fetch_dune_table_dates: {e}")
+
+def fetch_rds_table_dates(**kwargs):
+    try:
+        latest_rds_dates_df = pd.DataFrame()
+
+        for table_name in TABLE_NAMES:
+            query = text(f"""
+                SELECT '{table_name}' as table_name, MAX(date) as max_date 
+                FROM {table_name}
+            """)
+            
+            df = pd.read_sql(query, rds_engine)
+            latest_rds_dates_df = pd.concat([latest_rds_dates_df, df])
+            
+        # Save RDS dates to a separate file
+        ensure_dir(DATA_DIR)
+        file_path = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+        latest_rds_dates_df.to_csv(file_path, index=False)
+        print(f"Saved RDS dates to {file_path}")
+        print(f"Latest RDS dates: {latest_rds_dates_df.to_string()}")
+        
+        validate_latest_rds_dates_file()
+
+    except Exception as e:
+        raise AirflowException(f"Error in fetch_rds_table_dates: {e}")
 
 def insert_df_to_dune(df, table_name):
     try:
@@ -447,15 +481,78 @@ def insert_df_to_dune(df, table_name):
         return response
     except Exception as e:
         raise AirflowException(f"Error in insert_df_to_dune: {e}")
+    
+def parse_latest_dates(delta=0):
+    validate_latest_dune_dates_file()
+    latest_dune_dates_file = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
+    latest_dune_dates_df = pd.read_csv(latest_dune_dates_file)
 
-# Validation functions
-def validate_latest_dates_file():
-    latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
-    if not os.path.exists(latest_dates_file):
-        raise AirflowException(f"Latest dates file not found: {latest_dates_file}")
-    df = pd.read_csv(latest_dates_file)
+    validate_latest_rds_dates_file()
+    latest_rds_dates_file = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+    latest_rds_dates_df = pd.read_csv(latest_rds_dates_file)
+
+    print(f"Latest Dune dates: {latest_dune_dates_df.to_string()}")
+    print(f"Latest RDS dates: {latest_rds_dates_df.to_string()}")
+
+    data = {
+        'dune_date': [],
+        'rds_date': [],
+        'min_of_max_dates': []
+    }
+
+    for table_name in TABLE_NAMES:
+        try:
+            
+            dune_date = latest_dune_dates_df.loc[
+                latest_dune_dates_df['table_name'] == table_name,
+                'max_date'
+            ].iloc[0]
+
+            rds_date = latest_rds_dates_df.loc[
+                latest_rds_dates_df['table_name'] == table_name,
+                'max_date'
+            ].iloc[0]
+
+            # Convert string dates to datetime objects for comparison
+            dune_date = datetime.strptime(dune_date, '%Y-%m-%d') + timedelta(days=delta)
+            rds_date = datetime.strptime(rds_date, '%Y-%m-%d') + timedelta(days=delta)
+            
+            # Get the earliest date to ensure we don't miss any data
+            min_of_max_dates = min(dune_date, rds_date)
+
+            # Append values to lists
+            data['dune_date'].append(dune_date)
+            data['rds_date'].append(rds_date) 
+            data['min_of_max_dates'].append(min_of_max_dates)
+
+        except Exception as e:
+            raise AirflowException(f"Warning: Could not find dates for table {table_name}: {e}")
+
+    # Create DataFrame with table_names as index
+    results = pd.DataFrame(data, index=TABLE_NAMES)
+    return results
+
+def validate_latest_dune_dates_file():
+    latest_dune_dates_file = os.path.join(DATA_DIR, 'latest_dune_dates.csv')
+
+    if not os.path.exists(latest_dune_dates_file):
+        raise AirflowException(f"Latest dates file not found: {latest_dune_dates_file}")
+    
+    df = pd.read_csv(latest_dune_dates_file)
+
     if not all(col in df.columns for col in ['table_name', 'max_date']):
-        raise AirflowException(f"Invalid format in latest_dates.csv. Expected columns: table_name, max_date")
+        raise AirflowException(f"Invalid format in latest_dune_dates.csv. Expected columns: table_name, max_date")
+    
+def validate_latest_rds_dates_file():
+    latest_rds_dates_file = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
+
+    if not os.path.exists(latest_rds_dates_file):
+        raise AirflowException(f"Latest dates file not found: {latest_rds_dates_file}")
+    
+    df = pd.read_csv(latest_rds_dates_file)
+
+    if not all(col in df.columns for col in ['table_name', 'max_date']):
+        raise AirflowException(f"Invalid format in latest_rds_dates.csv. Expected columns: table_name, max_date")
 
 def validate_protocols_file():
     protocols_file = os.path.join(DATA_DIR, 'protocols.json')
@@ -567,32 +664,28 @@ def fetch_protocol_tvls(**kwargs):
         if not api_key:
             raise ValueError("DefiLlama API key not found")
         
-        # Get the latest date from Dune
-        latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
-        if not os.path.exists(latest_dates_file):
-            raise AirflowException("Latest dates file not found")
-            
-        latest_dates_df = pd.read_csv(latest_dates_file)
-
-        # Only consider '_collateral_value' tables
-        collateral_value_tables = latest_dates_df[latest_dates_df['table_name'].str.endswith('_collateral_value')]
+        latest_dates_df = parse_latest_dates(0)
+        collateral_value_tables = latest_dates_df[latest_dates_df.index.str.endswith('_collateral_value')]
 
         if collateral_value_tables.empty:
             raise AirflowException("No '_collateral_value' tables found in latest_dates.csv")
 
         # Find the earliest date among these tables
-        latest_date_str = collateral_value_tables['max_date'].min()
-        start_date = datetime.strptime(latest_date_str, '%Y-%m-%d')
-        start_timestamp = int(start_date.timestamp())
+        latest_date = collateral_value_tables['min_of_max_dates'].min()
+        start_timestamp = int(latest_date.timestamp())
 
         if DEV_MODE:
-            print(f"Using earliest latest date from '_collateral_value' tables: {latest_date_str}")
+            print(f"Using earliest latest date from '_collateral_value' tables: {latest_date}")
             print(f"Corresponding timestamp: {start_timestamp}")
         
         # Read protocols data
         protocols_file = os.path.join(DATA_DIR, 'protocols.json')
         with open(protocols_file, 'r') as f:
             protocol_mappings = json.load(f)
+
+        if DEV_MODE:
+            protocol_mappings = protocol_mappings[:50]
+            print(f"DEV MODE: Choosing first 50 protocol mappings: {protocol_mappings}")
         
         # Read the list of protocol names from token_protocols directory
         token_protocols_dir = os.path.join(DATA_DIR, 'token_protocols')
@@ -706,7 +799,7 @@ def fetch_protocol_tvls(**kwargs):
                 with open(protocol_file, 'w') as f:
                     json.dump(sorted_data, f, indent=2)
             else:
-                print(f"No new data found for {slug} after {start_date.strftime('%Y-%m-%d')}")
+                print(f"No new data found for {slug} after {latest_date.strftime('%Y-%m-%d')}")
 
         import time
 
@@ -754,12 +847,10 @@ def process_tvls(**kwargs):
         protocols_lookup = {p['slug']: p for p in protocols_data}
 
         # Read latest dates for assets
-        latest_dates_file = os.path.join(DATA_DIR, 'latest_dates.csv')
-        if not os.path.exists(latest_dates_file):
-            raise AirflowException("Latest dates file not found")
-
-        latest_dates_df = pd.read_csv(latest_dates_file)
-        collateral_value_tables = latest_dates_df[latest_dates_df['table_name'].str.endswith('_collateral_value')]
+        latest_dates = parse_latest_dates(0)
+        start_dates = latest_dates['min_of_max_dates']
+        dune_dates = latest_dates['dune_date']
+        rds_dates = latest_dates['rds_date']
 
         # Load protocol metadata
         metadata_file = os.path.join(DATA_DIR, 'protocol_metadata.json')
@@ -769,33 +860,12 @@ def process_tvls(**kwargs):
         with open(metadata_file, 'r') as f:
             protocol_metadata = json.load(f)
 
-        # Create a mapping from asset name to latest date
-        asset_latest_dates = {}
-        for _, row in collateral_value_tables.iterrows():
-            table_name = row['table_name']
-            asset_name = table_name.replace('_collateral_value', '')
-            asset_latest_dates[asset_name] = row['max_date']
-
-        if DEV_MODE:
-            print(f"Asset latest dates: {asset_latest_dates}")
-
         # Process each asset
         assets_to_process = list(ASSET_MAPPING.items())[:1] if DEV_MODE else ASSET_MAPPING.items()
 
         for asset_code, asset_info in assets_to_process:
             asset_name = asset_info['name']
             print(f"\nProcessing asset: {asset_code} with info: {asset_info}")
-
-            # Get the latest date for this asset
-            asset_latest_date_str = asset_latest_dates.get(asset_name)
-            if not asset_latest_date_str:
-                print(f"No latest date found for asset {asset_name}. Skipping.")
-                continue
-
-            asset_latest_date = datetime.strptime(asset_latest_date_str, '%Y-%m-%d')
-
-            if DEV_MODE:
-                print(f"Latest date for {asset_name}: {asset_latest_date_str}")
 
             # Initialize per_protocol_data
             per_protocol_data = {}
@@ -902,10 +972,14 @@ def process_tvls(**kwargs):
 
             # After processing all protocols, aggregate data
             processed_data = {}
+
+            table_name = f"{asset_name}_collateral_value"
+            start_date = start_dates.loc[table_name] if table_name in start_dates.index else None
+
             for protocol_slug, protocol_dates in per_protocol_data.items():
                 for date, data in protocol_dates.items():
-                    if datetime.strptime(date, '%Y-%m-%d') <= asset_latest_date:
-                        continue  # Skip dates before the asset's latest date
+                    if datetime.strptime(date, '%Y-%m-%d') <= start_date:
+                        continue 
 
                     if date not in processed_data:
                         processed_data[date] = {}
@@ -930,7 +1004,7 @@ def process_tvls(**kwargs):
                 print(f"Filtered processed data: {processed_data}")
 
             if not processed_data:
-                print(f"No new data for asset {asset_name} after {asset_latest_date_str}")
+                print(f"No new data for asset {asset_name} after {start_date}")
                 continue
 
             # Convert to DataFrame format
@@ -960,10 +1034,17 @@ def process_tvls(**kwargs):
 
             # Save to CSV
             df = pd.DataFrame(csv_data)
-            csv_file = os.path.join(output_dir, f"{asset_info['name']}.csv")
-            df.to_csv(csv_file, index=False)
+
+            df_dune = df[df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d') >= dune_dates.loc[asset_name + '_collateral_value'])]
+            csv_file_dune = os.path.join(output_dir, f"{asset_info['name']}_dune.csv")
+            df_dune.to_csv(csv_file_dune, index=False)
+
+            df_rds = df[df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d') >= rds_dates.loc[asset_name + '_collateral_value'])]
+            csv_file_rds = os.path.join(output_dir, f"{asset_info['name']}_rds.csv")
+            df_rds.to_csv(csv_file_rds, index=False)
             
-            print(f"Saved CSV file for {asset_code} to {csv_file}")
+            print(f"Saved CSV files for {asset_code} to {csv_file_dune} and {csv_file_rds}")
+
             if DEV_MODE:
                 print("\nDataFrame info:")
                 print(df.info())
@@ -1078,7 +1159,7 @@ def upload_to_dune(**kwargs):
         asset_collateral_dir = os.path.join(DATA_DIR, 'asset_collateral_value')
         
         for asset_code, asset_info in ASSET_MAPPING.items():
-            csv_file = os.path.join(asset_collateral_dir, f"{asset_info['name']}.csv")
+            csv_file = os.path.join(asset_collateral_dir, f"{asset_info['name']}_dune.csv")
             
             if not os.path.exists(csv_file):
                 print(f"CSV file not found for {asset_code}: {csv_file}")
@@ -1097,6 +1178,39 @@ def upload_to_dune(**kwargs):
         
     except Exception as e:
         raise AirflowException(f"Error in upload_to_dune: {e}")
+
+def upload_to_rds(**kwargs):
+    try:
+        asset_collateral_dir = os.path.join(DATA_DIR, 'asset_collateral_value')
+        
+        for asset_code, asset_info in ASSET_MAPPING.items():
+            csv_file = os.path.join(asset_collateral_dir, f"{asset_info['name']}_rds.csv")
+            
+            if not os.path.exists(csv_file):
+                print(f"CSV file not found for {asset_code}: {csv_file}")
+                continue
+                
+            df = pd.read_csv(csv_file)
+            table_name = f"{asset_info['name']}_collateral_value"
+            
+            if DO_NOT_UPLOAD:
+                print(f"\nDO NOT UPLOAD: Data to be uploaded to RDS for {asset_code}:")
+                print(df.to_string())
+                print(f"Total rows: {len(df)}")
+                continue
+
+            df.to_sql(
+                table_name,
+                rds_engine,
+                if_exists='append', 
+                index=False,
+                method='multi',
+                chunksize=1000
+            )
+            print(f"Successfully uploaded {len(df)} rows to RDS table {table_name}")
+            
+    except Exception as e:
+        raise AirflowException(f"Error in upload_to_rds: {e}")
 
 def clear_data_directory(**kwargs):
     """Clears all data from the DATA_DIR before running the DAG."""
@@ -1137,9 +1251,15 @@ clear_data_task = PythonOperator(
     dag=dag,
 )
 
-get_latest_dates_task = PythonOperator(
-    task_id='get_latest_dates',
+fetch_dune_table_dates_task = PythonOperator(
+    task_id='fetch_dune_table_dates',
     python_callable=fetch_dune_table_dates,
+    dag=dag,
+)
+
+fetch_rds_table_dates_task = PythonOperator(
+    task_id='fetch_rds_table_dates',
+    python_callable=fetch_rds_table_dates,
     dag=dag,
 )
 
@@ -1173,6 +1293,13 @@ upload_to_dune_task = PythonOperator(
     dag=dag,
 )
 
-clear_data_task >> [get_latest_dates_task, fetch_all_protocols_task]
-get_latest_dates_task >> fetch_asset_protocols_task
-[fetch_all_protocols_task, fetch_asset_protocols_task] >> fetch_protocol_tvls_task >> process_tvls_task >> upload_to_dune_task
+upload_to_rds_task = PythonOperator(
+    task_id='upload_to_rds',
+    python_callable=upload_to_rds,
+    dag=dag,
+)
+
+clear_data_task >> [fetch_rds_table_dates_task, fetch_dune_table_dates_task, fetch_all_protocols_task]
+fetch_rds_table_dates_task >> fetch_asset_protocols_task
+fetch_dune_table_dates_task >> fetch_asset_protocols_task
+[fetch_all_protocols_task, fetch_asset_protocols_task] >> fetch_protocol_tvls_task >> process_tvls_task >> [upload_to_dune_task, upload_to_rds_task]
