@@ -344,6 +344,13 @@ def process_network_stats(**kwargs):
         
         # Convert to DataFrame and save as CSV
         df = pd.DataFrame(processed_data)
+
+        if df.empty:
+            task_instance = kwargs['task_instance']
+            task_instance.xcom_push(key='no_data', value=True)
+            print("No data to process. Skipping upload.")
+            return
+
         print(f"Processed data: {df.to_string(index=False)}")
         df['date'] = pd.to_datetime(df['date'])
 
@@ -361,11 +368,17 @@ def process_network_stats(**kwargs):
         print(f"Processed and saved {len(df_rds)} records for RDS from {df_rds['date'].min()} to {df_rds['date'].max()}")
         
     except Exception as e:
-        print(f"Error in process_network_stats: {str(e)}")
         raise AirflowException(f"Error in process_network_stats: {e}")
 
 def upload_to_dune(**kwargs):
     try:
+        task_instance = kwargs['task_instance']
+        no_data = task_instance.xcom_pull(key='no_data', task_ids='process_network_stats')
+        
+        if no_data:
+            print("No data was processed. Skipping Dune upload.")
+            return
+
         csv_file = os.path.join(DATA_DIR, 'processed', 'stats_history_dune.csv')
         df = pd.read_csv(csv_file)
         
@@ -383,6 +396,13 @@ def upload_to_dune(**kwargs):
     
 def upload_to_rds(**kwargs):
     try:
+        task_instance = kwargs['task_instance']
+        no_data = task_instance.xcom_pull(key='no_data', task_ids='process_network_stats')
+        
+        if no_data:
+            print("No data was processed. Skipping RDS upload.")
+            return
+        
         processed_file = os.path.join(DATA_DIR, 'processed', 'stats_history_rds.csv')
         
         if not os.path.exists(processed_file):
@@ -423,7 +443,7 @@ dag = DAG(
     'taostats_network_pipeline',
     default_args=default_args,
     description='A DAG for fetching and processing Taostats network statistics',
-    schedule_interval=timedelta(days=1),
+    schedule_interval=timedelta(days=2),
     start_date=days_ago(1),
     catchup=False
 )
