@@ -687,7 +687,7 @@ dag = DAG(
     'staking_rewards_pipeline',
     default_args=default_args,
     description='A DAG for fetching and processing Staking Rewards data',
-    schedule_interval=timedelta(days=1),
+    schedule_interval=timedelta(days=3),
     start_date=days_ago(1),
     catchup=False
 )

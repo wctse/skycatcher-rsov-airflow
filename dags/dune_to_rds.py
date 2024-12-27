@@ -304,7 +304,7 @@ dag = DAG(
     dag_id='dune_to_rds',
     default_args=default_args,
     description='Fetch data from Dune (query or matview), slice by RDS date, and upload. Uses dune_client and a config-based approach.',
-    schedule_interval=timedelta(days=1),
+    schedule_interval=timedelta(days=3),
     start_date=days_ago(1),
     catchup=False,
     max_active_runs=1
