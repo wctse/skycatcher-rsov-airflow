@@ -14,9 +14,11 @@ import os
 from airflow.utils.dates import days_ago
 import time
 from requests.exceptions import RequestException
+import shutil
 
 # Global Development Mode Flag
-DEV_MODE = False  # Set to False for production
+TRIM_MODE = False # Trim the amount of data fetched and processed
+RESET_MODE = True  # Ignore all previous data in Dune and RDS and start from scratch
 DO_NOT_UPLOAD = False
 
 # Configuration
@@ -78,7 +80,8 @@ def make_api_request(url, method='GET', headers=None, data=None, max_retries=3, 
                 else:
                     print("Max retries reached for rate limit.")
             else:
-                print(f"Error occurred: {response.status_code}")
+                raise AirflowException(f"Error occurred: {response.status_code, response.text}")
+
             return None
             
         except RequestException as e:
@@ -110,7 +113,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616" #"4170616" if not DEV_MODE else "4226299"
+            query_id="4170616" if not RESET_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -126,11 +129,11 @@ def fetch_dune_table_dates(**kwargs):
         raise AirflowException(f"Error in fetch_dune_table_dates: {e}")
     
 def fetch_rds_table_dates(**kwargs):
-    try:        
-        query = text(f"""
-            SELECT '{TABLE_NAME}' as table_name, MAX(date) as max_date 
-            FROM {TABLE_NAME}
-        """)
+    try:
+        if not RESET_MODE:
+            query = text(f"SELECT '{TABLE_NAME}' as table_name, MAX(date) as max_date FROM {TABLE_NAME}")
+        else:
+            query = text(f"SELECT '{TABLE_NAME}' as table_name, CAST('2010-01-01' as DATE) as max_date FROM {TABLE_NAME}")
         
         df = pd.read_sql(query, rds_engine)
         
@@ -242,8 +245,8 @@ def validate_subnet_history_files(netuids):
     if not os.path.exists(SUBNET_HISTORY_DIR):
         raise AirflowException(f"Subnet history directory not found: {SUBNET_HISTORY_DIR}")
     
-    if DEV_MODE:
-        netuids = netuids[:2]
+    if TRIM_MODE:
+        netuids = netuids[:5]
         
     for netuid in netuids:
         file_path = os.path.join(SUBNET_HISTORY_DIR, f'subnet_{netuid}.json')
@@ -271,7 +274,7 @@ def get_last_processed_timestamp(netuid):
 
 def adjust_date(timestamp):
     date = datetime.strptime(timestamp.split('.')[0].rstrip('Z'), '%Y-%m-%dT%H:%M:%S')
-    date += timedelta(days=1)
+    # date += timedelta(days=1)
     return date.strftime('%Y-%m-%d')
 
 # Task functions
@@ -346,14 +349,22 @@ def fetch_subnet_histories(**kwargs):
 
         ensure_dir(SUBNET_HISTORY_DIR)
         
-        latest_dates = parse_latest_dates(0)
+        if not RESET_MODE:
+            latest_dates = parse_latest_dates(0)
+        else:
+            latest_dates = {
+                'dune_date': '2010-01-01 00:00:00',
+                'rds_date': '2010-01-01 00:00:00',
+                'min_of_max_dates': '2010-01-01 00:00:00'
+            }
+        
         start_date = (latest_dates['min_of_max_dates'])
         
         # Format the start date to include time component
         start_timestamp = parse_timestamp(start_date, "%Y-%m-%d %H:%M:%S")
         timestamp_formats = ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ']
         
-        subnets_to_process = subnet_data['data'] if not DEV_MODE else subnet_data['data'][:2]
+        subnets_to_process = subnet_data['data'] if not TRIM_MODE else subnet_data['data'][:5]
         
         for subnet in subnets_to_process:
             netuid = subnet['netuid']
@@ -388,8 +399,11 @@ def fetch_subnet_histories(**kwargs):
                 if len(new_items) < QUERY_LIMIT:
                     has_more_data = False
                 else:
-                    # Update current_start to the timestamp of the last item
-                    current_start = parse_timestamp(new_items[-1]['timestamp'], timestamp_formats, return_datetime=False)
+                    # Update current_start to the timestamp of the last item plus one hour
+                    latest_timestamp = new_items[-1]['timestamp']
+                    latest_dt = parse_timestamp(latest_timestamp, timestamp_formats, return_datetime=True)
+                    next_dt = latest_dt + timedelta(hours=1)
+                    current_start = int(next_dt.timestamp())
             
             # Sort new data by timestamp before saving
             new_history_data.sort(key=lambda x: x['timestamp'])
@@ -423,7 +437,7 @@ def fetch_dune_baseline_values(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Bittensor subnets stats latest date",
-            query_id="4201406"
+            query_id="4201406" if not RESET_MODE else "4533960"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -449,14 +463,10 @@ def fetch_rds_baseline_values(**kwargs):
     try:
         print("Fetching baseline values from RDS")
 
-        query = text(f"""
-            SELECT *
-            FROM {TABLE_NAME}
-            WHERE date = (
-                SELECT MAX(date)
-                FROM {TABLE_NAME}
-            )
-        """)
+        if not RESET_MODE:
+            query = text(f"SELECT * FROM {TABLE_NAME} WHERE date = (SELECT MAX(date) FROM {TABLE_NAME})")
+        else:
+            query = text(f"SELECT '2010-01-01' AS date, 0 AS cumulative_subnet_0_recycled, 0 AS other_subnets_recycled, 0 AS total_recycled")
 
         df = pd.read_sql(query, rds_engine)
         
@@ -509,9 +519,12 @@ def process_subnet_data(**kwargs):
         with open(subnet_list_file, 'r') as f:
             subnet_data = json.load(f)
             
-        subnets_to_process = subnet_data['data'] if not DEV_MODE else subnet_data['data'][:2]
+        subnets_to_process = subnet_data['data']
 
         netuids = [subnet['netuid'] for subnet in subnets_to_process]
+        if TRIM_MODE:
+            netuids = netuids[:5]
+
         print(f"Processing {len(netuids)} subnets: {netuids}")
         
         # Constants
@@ -578,8 +591,10 @@ def process_subnet_data(**kwargs):
                     date = adjust_date(entry['timestamp'])
                     recycled = float(entry['recycled_lifetime']) / 1e9
                     
+                    # Initialize the date if it doesn't exist
                     if date not in other_subnets_recycled_by_date:
                         other_subnets_recycled_by_date[date] = 0
+                    
                     other_subnets_recycled_by_date[date] += recycled
             
             # Step 8: Combine all data
@@ -596,7 +611,7 @@ def process_subnet_data(**kwargs):
             if all_dates:
                 first_new_date = datetime.strptime(all_dates[0], '%Y-%m-%d').date()
                 date_gap = (first_new_date - baseline_date).days
-                if date_gap > 1:
+                if date_gap > 1 and not RESET_MODE:
                     raise AirflowException(f"Gap detected between baseline date {baseline_date} and first new date {first_new_date}")
                 print(f"Data continuity verified. First new date: {first_new_date}")
             
@@ -644,15 +659,6 @@ def process_subnet_data(**kwargs):
                 
                 # Update the previous value AFTER using it for calculations
                 previous_other_subnets_recycled = current_other_subnets_recycled
-                
-                if DEV_MODE and len(final_data) <= 5:
-                    print(f"\nProcessed date: {date}")
-                    print(f"subnet_0_emission: {subnet_0_emission}")
-                    print(f"subnet_0_recycled: {subnet_0_recycled}")
-                    print(f"cumulative_subnet_0_recycled: {cumulative_subnet_0_recycled}")
-                    print(f"current_other_subnets_recycled: {current_other_subnets_recycled}")
-                    print(f"daily_other_subnets_recycled: {daily_other_subnets_recycled}")
-                    print(f"total_recycled: {total_recycled}")
             
             # Convert to DataFrame and save
             df = pd.DataFrame(final_data)
@@ -718,6 +724,20 @@ def upload_to_rds(**kwargs):
             
     except Exception as e:
         raise AirflowException(f"Error in upload_to_rds: {e}")
+    
+def clear_data_directory(**kwargs):
+    """Clears all data from the DATA_DIR before running the DAG."""
+    try:
+        if os.path.exists(DATA_DIR):
+            print(f"Clearing contents of {DATA_DIR}")
+            shutil.rmtree(DATA_DIR)
+            print(f"Creating fresh {DATA_DIR}")
+            os.makedirs(DATA_DIR)
+        else:
+            print(f"Creating {DATA_DIR}")
+            os.makedirs(DATA_DIR)
+    except Exception as e:
+        raise AirflowException(f"Error clearing data directory: {e}")
 
 # Modify the DAG definition section at the bottom of the file
 default_args = {
@@ -736,6 +756,12 @@ dag = DAG(
     schedule_interval=timedelta(days=3),
     start_date=days_ago(1),
     catchup=False
+)
+
+clear_data_directory_task = PythonOperator(
+    task_id='clear_data_directory',
+    python_callable=clear_data_directory,
+    dag=dag,
 )
 
 get_latest_dune_dates_task = PythonOperator(
@@ -780,4 +806,4 @@ upload_to_rds_task = PythonOperator(
     dag=dag,
 )
 
-[get_latest_dune_dates_task, get_latest_rds_dates_task] >> fetch_subnet_list_task >> fetch_subnet_histories_task >> process_subnet_data_task >> [upload_to_dune_task, upload_to_rds_task]
+clear_data_directory_task >> [get_latest_dune_dates_task, get_latest_rds_dates_task] >> fetch_subnet_list_task >> fetch_subnet_histories_task >> process_subnet_data_task >> [upload_to_dune_task, upload_to_rds_task]

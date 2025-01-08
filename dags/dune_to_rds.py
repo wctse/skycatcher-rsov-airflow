@@ -47,6 +47,12 @@ CONFIGS = [
         "type": "query",
         "query_id": 4460227,
         "date_column": "day",
+    },
+    {
+        "rds_table_name": "prices_usd_daily",
+        "type": "query",
+        "query_id": 4504144,
+        "date_column": "day",
     }
 ]
 
@@ -240,6 +246,8 @@ def slice_data(rds_table_name, date_column, **kwargs):
             raise ValueError(f"No '{date_column}' column found in raw data. Skipping slicing logic. Columns: {raw_df.columns}")
 
         raw_df[date_column] = pd.to_datetime(raw_df[date_column])
+        raw_df[date_column] = pd.to_datetime(raw_df[date_column], utc=True)
+        latest_date = pd.to_datetime(latest_date, utc=True)
         filtered_df = raw_df[raw_df[date_column] > latest_date].copy()
         filtered_df.to_csv(out_file, index=False)
 
