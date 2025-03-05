@@ -53,6 +53,12 @@ CONFIGS = [
         "type": "query",
         "query_id": 4504144,
         "date_column": "day",
+    },
+    {
+        "rds_table_name": "sonic_staking_value_dune_constructed",
+        "type": "query",
+        "query_id": 4794474,
+        "date_column": "date",
     }
 ]
 
@@ -313,7 +319,7 @@ dag = DAG(
     default_args=default_args,
     description='Fetch data from Dune (query or matview), slice by RDS date, and upload. Uses dune_client and a config-based approach.',
     schedule_interval=timedelta(days=3),
-    start_date=days_ago(1),
+    start_date=datetime(2025, 1, 6, 5, 0, 0),
     catchup=False,
     max_active_runs=1
 )

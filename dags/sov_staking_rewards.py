@@ -17,7 +17,8 @@ from requests.exceptions import RequestException
 
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
-DO_NOT_UPLOAD = False
+DO_NOT_UPLOAD = True
+RESET_MODE = True
 
 rds_conn = BaseHook.get_connection('rds_connection')
 rds_engine = create_engine(
@@ -127,7 +128,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616" #"4170616" if not DEV_MODE else "4226299"
+            query_id="4170616" if not RESET_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -684,11 +685,11 @@ default_args = {
 }
 
 dag = DAG(
-    'staking_rewards_pipeline',
+    'sov_staking_rewards_pipeline',
     default_args=default_args,
     description='A DAG for fetching and processing Staking Rewards data',
     schedule_interval=timedelta(days=3),
-    start_date=days_ago(1),
+    start_date=datetime(2025, 2, 26, 3, 30, 0),
     catchup=False
 )
 

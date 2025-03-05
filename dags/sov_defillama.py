@@ -55,7 +55,8 @@ TOKENS_CONFIG = {
     "tia": ["TIA", "WTIA", "STTIA"],
     "sui": ["SUI"],
     "bnb": ["BNB", "WBNB"],
-    "sei": ["SEI", "WSEI", "ISEI"]
+    "sei": ["SEI", "WSEI", "ISEI"],
+    "sonic": ["S", "WS", "STS"]
 }
 
 IGNORES_LIST = [
@@ -107,7 +108,8 @@ ASSET_MAPPING = {
     'ton': {'chain': 'Ton', 'name': 'ton'},
     'tia': {'chain': 'Celestia', 'name': 'celestia'},
     'sei': {'chain': 'Sei', 'name': 'sei'},
-    'tao': {'chain': 'Bittensor', 'name': 'bittensor'}
+    'tao': {'chain': 'Bittensor', 'name': 'bittensor'},
+    'sonic': {'chain': 'Sonic', 'name': 'sonic'}
 }
 
 CATEGORIES_TO_IGNORE = ['Liquid Staking', 'Liquid Restaking', 'CEX', 'Yield Aggregator']
@@ -444,7 +446,7 @@ def fetch_rds_table_dates(**kwargs):
 
         for table_name in TABLE_NAMES:
             query = text(f"""
-                SELECT '{table_name}' as table_name, MAX(date) as max_date 
+                SELECT '{table_name}' as table_name, COALESCE(MAX(date), '2010-01-01') as max_date 
                 FROM {table_name}
             """)
             
@@ -806,7 +808,7 @@ def fetch_protocol_tvls(**kwargs):
         start_time = time.time()
 
         # Use ThreadPoolExecutor to fetch protocols in parallel
-        max_workers = 10  # Limit to avoid exceeding rate limit
+        max_workers = 5  # Limit to avoid exceeding rate limit
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
             for protocol_name in protocols_to_process:
@@ -1237,11 +1239,11 @@ default_args = {
 }
 
 dag = DAG(
-    'defillama_pipeline',
+    'sov_defillama_pipeline',
     default_args=default_args,
     description='A DAG for fetching and processing DeFiLlama data',
     schedule_interval=timedelta(days=3),
-    start_date=days_ago(1),
+    start_date=datetime(2025, 2, 26, 0, 0, 0),
     catchup=False
 )
 

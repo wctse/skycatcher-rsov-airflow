@@ -18,7 +18,7 @@ import shutil
 
 # Global Development Mode Flag
 TRIM_MODE = False # Trim the amount of data fetched and processed
-RESET_MODE = True  # Ignore all previous data in Dune and RDS and start from scratch
+RESET_MODE = False  # Ignore all previous data in Dune and RDS and start from scratch
 DO_NOT_UPLOAD = False
 
 # Configuration
@@ -750,11 +750,11 @@ default_args = {
 }
 
 dag = DAG(
-    'taostats_subnet_pipeline',
+    'sov_taostats_subnet_pipeline',
     default_args=default_args,
     description='A DAG for fetching and processing TaoStats subnet data',
     schedule_interval=timedelta(days=3),
-    start_date=days_ago(1),
+    start_date=datetime(2025, 2, 26, 2, 30, 0),
     catchup=False
 )
 

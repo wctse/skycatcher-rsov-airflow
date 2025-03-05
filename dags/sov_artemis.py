@@ -396,11 +396,11 @@ default_args = {
 }
 
 dag = DAG(
-    'artemis_pipeline',
+    'sov_artemis_pipeline',
     default_args=default_args,
     description='A DAG for fetching and processing Artemis price, market cap and fdv data',
     schedule_interval=timedelta(days=3),
-    start_date=days_ago(1),
+    start_date=datetime(2025, 2, 26, 4, 0, 0),
     catchup=False
 )
 
