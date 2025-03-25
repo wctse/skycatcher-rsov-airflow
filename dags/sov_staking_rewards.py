@@ -17,8 +17,8 @@ from requests.exceptions import RequestException
 
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
-DO_NOT_UPLOAD = True
-RESET_MODE = True
+DO_NOT_UPLOAD = False
+RESET_MODE = False
 
 rds_conn = BaseHook.get_connection('rds_connection')
 rds_engine = create_engine(
@@ -38,7 +38,7 @@ BLOCKCHAINS = {
     'the-open-network': 'ton',
     'celestia': 'celestia',
     'sui': 'sui',
-    # 'binance-smart-chain': 'binance',
+    'binance-smart-chain': 'binance',
     'sei-network': 'sei'
 }
 METRICS = [
@@ -150,7 +150,7 @@ def fetch_rds_table_dates(**kwargs):
 
         for table_name in TABLE_NAMES:
             query = text(f"""
-                SELECT '{table_name}' as table_name, MAX(date) as max_date 
+                SELECT '{table_name}' as table_name, COALESCE(MAX(date), '2010-01-01') as max_date 
                 FROM {table_name}
             """)
             
@@ -215,6 +215,9 @@ def parse_latest_dates(delta=0):
                 latest_rds_dates_df['table_name'] == table_name,
                 'max_date'
             ].iloc[0]
+
+            print(f'dune_date: {dune_date}')
+            print(f'rds_date: {rds_date}')
 
             # Convert string dates to datetime objects for comparison
             dune_date = datetime.strptime(dune_date, '%Y-%m-%d') + timedelta(days=delta)
