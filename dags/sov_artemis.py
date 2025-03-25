@@ -18,6 +18,7 @@ from requests.exceptions import RequestException
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
 DO_NOT_UPLOAD = False
+RESET_MODE = False
 
 # Configuration
 API_ENDPOINT = "https://api.artemisxyz.com/data"
@@ -26,7 +27,7 @@ ASSETS = [
     'aptos',
     'avalanche',
     # 'bittensor' # Bittensor is not availalbe on Artemis, as well as we are using mcap for it
-    # 'binance', # ignoring BNB chain for now
+    'bsc',
     'celestia',
     'ethereum',
     'near',
@@ -203,15 +204,19 @@ def parse_latest_dates(delta=0):
     latest_rds_dates_file = os.path.join(DATA_DIR, 'latest_rds_dates.csv')
     latest_rds_dates_df = pd.read_csv(latest_rds_dates_file)
 
-    dune_date = latest_dune_dates_df.loc[
-        latest_dune_dates_df['table_name'] == TABLE_NAME,
-        'max_date'
-    ].iloc[0]
+    if not RESET_MODE:
+        dune_date = latest_dune_dates_df.loc[
+            latest_dune_dates_df['table_name'] == TABLE_NAME,
+            'max_date'
+        ].iloc[0]
 
-    rds_date = latest_rds_dates_df.loc[
-        latest_rds_dates_df['table_name'] == TABLE_NAME,
-        'max_date'
-    ].iloc[0]
+        rds_date = latest_rds_dates_df.loc[
+            latest_rds_dates_df['table_name'] == TABLE_NAME,
+            'max_date'
+        ].iloc[0]
+
+    else:
+        dune_date = rds_date = '2010-01-01'
 
     # Convert string dates to datetime objects for comparison
     dune_date = datetime.strptime(dune_date, '%Y-%m-%d') + timedelta(days=delta)
