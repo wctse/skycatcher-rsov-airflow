@@ -11,15 +11,19 @@ import pandas as pd
 from dune_client.client import DuneClient
 from dune_client.query import QueryBase
 import os
-from airflow.utils.dates import days_ago
 import time
 from requests.exceptions import RequestException
 import concurrent.futures
 import shutil
+from config.schedules import get_schedule_interval, get_start_date, get_dag_config
 
 # Global Development Mode Flag
-DEV_MODE = False  # Set to False for production
+VERBOSE_MODE = False  # Print more information. Set to False for production
 DO_NOT_UPLOAD = False
+RESET_MODE = False # Set to True to upload all fetched date
+TRIMMED_TESTING_MODE = False # Set to True to only process first 50 protocols
+
+MAX_WORKERS = 5  # Avoid exceeding rate and memory limits
 
 rds_conn = BaseHook.get_connection('rds_connection')
 rds_engine = create_engine(
@@ -343,7 +347,7 @@ INTERPOLATES = [
 
 # Data directory
 DATA_DIR = '/tmp/defillama'
-TABLE_NAMES = [asset['name'] + '_collateral_value' for asset in ASSET_MAPPING.values()]
+TABLE_NAMES = [asset['name'] + '_deposit_value' for asset in ASSET_MAPPING.values()]
 
 # Utility functions
 def load_api_key(key_name):
@@ -426,7 +430,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616" # "4170616" if not DEV_MODE else "4226299"
+            query_id="4170616" if not RESET_MODE else "4226299"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -600,8 +604,8 @@ def fetch_all_protocols(**kwargs):
             
         print(f"Saved {len(simplified_protocols)} protocol entries to {all_protocols_file}")
         
-        if DEV_MODE and simplified_protocols:
-            print("DEV MODE: Sample protocol data:")
+        if TRIMMED_TESTING_MODE and simplified_protocols:
+            print("TRIMMED_TESTING_MODE: Sample protocol data:")
             print(json.dumps(simplified_protocols[0], indent=2))
             
     except Exception as e:
@@ -651,10 +655,6 @@ def fetch_asset_protocols(**kwargs):
                 json.dump(list(asset_protocols), f, indent=2)
             
             print(f"Saved {len(asset_protocols)} protocol names for asset {asset}")
-            
-            # if DEV_MODE:
-            #     print(f"DEV MODE: First few protocol names for {asset}:")
-            #     print(json.dumps(list(asset_protocols)[:3], indent=2))
                 
     except Exception as e:
         raise AirflowException(f"Error in fetch_asset_protocols: {e}")
@@ -667,17 +667,17 @@ def fetch_protocol_tvls(**kwargs):
             raise ValueError("DefiLlama API key not found")
         
         latest_dates_df = parse_latest_dates(0)
-        collateral_value_tables = latest_dates_df[latest_dates_df.index.str.endswith('_collateral_value')]
+        deposit_value_tables = latest_dates_df[latest_dates_df.index.str.endswith('_deposit_value')]
 
-        if collateral_value_tables.empty:
-            raise AirflowException("No '_collateral_value' tables found in latest_dates.csv")
+        if deposit_value_tables.empty:
+            raise AirflowException("No '_deposit_value' tables found in latest_dates.csv")
 
         # Find the earliest date among these tables
-        latest_date = collateral_value_tables['min_of_max_dates'].min()
+        latest_date = deposit_value_tables['min_of_max_dates'].min()
         start_timestamp = int(latest_date.timestamp())
 
-        if DEV_MODE:
-            print(f"Using earliest latest date from '_collateral_value' tables: {latest_date}")
+        if VERBOSE_MODE:
+            print(f"Using earliest latest date from '_deposit_value' tables: {latest_date}")
             print(f"Corresponding timestamp: {start_timestamp}")
         
         # Read protocols data
@@ -685,9 +685,9 @@ def fetch_protocol_tvls(**kwargs):
         with open(protocols_file, 'r') as f:
             protocol_mappings = json.load(f)
 
-        if DEV_MODE:
+        if TRIMMED_TESTING_MODE:
             protocol_mappings = protocol_mappings[:50]
-            print(f"DEV MODE: Choosing first 50 protocol mappings: {protocol_mappings}")
+            print(f"TRIMMED_TESTING_MODE: Choosing first 50 protocol mappings: {protocol_mappings}")
         
         # Read the list of protocol names from token_protocols directory
         token_protocols_dir = os.path.join(DATA_DIR, 'token_protocols')
@@ -808,8 +808,7 @@ def fetch_protocol_tvls(**kwargs):
         start_time = time.time()
 
         # Use ThreadPoolExecutor to fetch protocols in parallel
-        max_workers = 5  # Limit to avoid exceeding rate limit
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = []
             for protocol_name in protocols_to_process:
                 future = executor.submit(fetch_single_protocol, protocol_name)
@@ -832,10 +831,10 @@ def process_tvls(**kwargs):
     """Processes TVL data and generates final CSV files."""
     try:
         protocol_values_dir = os.path.join(DATA_DIR, 'protocol_values')
-        output_dir = os.path.join(DATA_DIR, 'asset_collateral_value')
+        output_dir = os.path.join(DATA_DIR, 'asset_deposit_value')
         ensure_dir(output_dir)
 
-        if DEV_MODE:
+        if VERBOSE_MODE:
             print("\nDEV MODE: Starting process_tvls")
             print(f"Protocol values directory exists: {os.path.exists(protocol_values_dir)}")
             print(f"Contents: {os.listdir(protocol_values_dir)}")
@@ -863,7 +862,7 @@ def process_tvls(**kwargs):
             protocol_metadata = json.load(f)
 
         # Process each asset
-        assets_to_process = list(ASSET_MAPPING.items())[:1] if DEV_MODE else ASSET_MAPPING.items()
+        assets_to_process = list(ASSET_MAPPING.items())[:1] if TRIMMED_TESTING_MODE else ASSET_MAPPING.items()
 
         for asset_code, asset_info in assets_to_process:
             asset_name = asset_info['name']
@@ -874,10 +873,6 @@ def process_tvls(**kwargs):
 
             # Get list of protocol files
             protocol_files = [f for f in os.listdir(protocol_values_dir) if f.endswith('.json')]
-
-            if DEV_MODE:
-                # protocol_files = protocol_files[:2]
-                print(f"Processing protocols: {protocol_files}")
 
             for protocol_file in protocol_files:
                 protocol_slug = protocol_file.replace('.json', '')
@@ -943,7 +938,8 @@ def process_tvls(**kwargs):
                                     per_protocol_data[protocol_slug][date]['estimatedTokensInUsd'][chain] = []
                                 estimated_value = tvl_value / 2
                                 per_protocol_data[protocol_slug][date]['estimatedTokensInUsd'][chain].append(estimated_value)
-                                if DEV_MODE:
+
+                                if VERBOSE_MODE:
                                     print(f"Added estimated value {estimated_value} for {date} on chain {chain} "
                                           f"(Reason: {'Ignore list' if ignore_entry else 'Misrepresented' if is_misrepresented else 'No TokensInUsd data'})")
 
@@ -960,8 +956,9 @@ def process_tvls(**kwargs):
                             for token, value in tokens_data.items():
                                 if token in TOKENS_CONFIG[asset_code]:
                                     total_value += value
-                                    if DEV_MODE:
+                                    if VERBOSE_MODE:
                                         print(f"Added token value {value} for {token} on {date} (chain: {chain})")
+
                             if total_value > 0:
                                 if chain not in per_protocol_data[protocol_slug][date]['tokensInUsd']:
                                     per_protocol_data[protocol_slug][date]['tokensInUsd'][chain] = []
@@ -975,7 +972,7 @@ def process_tvls(**kwargs):
             # After processing all protocols, aggregate data
             processed_data = {}
 
-            table_name = f"{asset_name}_collateral_value"
+            table_name = f"{asset_name}_deposit_value"
             start_date = start_dates.loc[table_name] if table_name in start_dates.index else None
 
             for protocol_slug, protocol_dates in per_protocol_data.items():
@@ -1002,7 +999,7 @@ def process_tvls(**kwargs):
                 last_date = max(processed_data.keys())
                 processed_data.pop(last_date, None)
 
-            if DEV_MODE:
+            if VERBOSE_MODE:
                 print(f"Filtered processed data: {processed_data}")
 
             if not processed_data:
@@ -1021,10 +1018,10 @@ def process_tvls(**kwargs):
                             'chain': chain,
                             'tokens_usd': values['tokens_usd'],
                             'estimated_tokens_usd': values['estimated_tokens_usd'],
-                            'total_collateral_value': total_value
+                            'total_deposit_value': total_value
                         })
 
-            if DEV_MODE:
+            if VERBOSE_MODE:
                 print(f"\nProcessed data summary:")
                 print(f"Total records: {len(csv_data)}")
                 if csv_data:
@@ -1037,21 +1034,21 @@ def process_tvls(**kwargs):
             # Save to CSV
             df = pd.DataFrame(csv_data)
 
-            df_dune = df[df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d') >= dune_dates.loc[asset_name + '_collateral_value'])]
+            df_dune = df[df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d') >= dune_dates.loc[asset_name + '_deposit_value'])]
             csv_file_dune = os.path.join(output_dir, f"{asset_info['name']}_dune.csv")
             df_dune.to_csv(csv_file_dune, index=False)
 
-            df_rds = df[df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d') >= rds_dates.loc[asset_name + '_collateral_value'])]
+            df_rds = df[df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d') >= rds_dates.loc[asset_name + '_deposit_value'])]
             csv_file_rds = os.path.join(output_dir, f"{asset_info['name']}_rds.csv")
             df_rds.to_csv(csv_file_rds, index=False)
             
             print(f"Saved CSV files for {asset_code} to {csv_file_dune} and {csv_file_rds}")
 
-            if DEV_MODE:
+            if VERBOSE_MODE:
                 print("\nDataFrame info:")
                 print(df.info())
                 print("\nSummary by chain:")
-                print(df.groupby('chain')['total_collateral_value'].sum())
+                print(df.groupby('chain')['total_deposit_value'].sum())
 
     except Exception as e:
         print(f"Detailed error: {str(e)}")
@@ -1158,7 +1155,7 @@ def upload_to_dune(**kwargs):
     """Uploads processed data to Dune Analytics."""
     
     try:
-        asset_collateral_dir = os.path.join(DATA_DIR, 'asset_collateral_value')
+        asset_collateral_dir = os.path.join(DATA_DIR, 'asset_deposit_value')
         
         for asset_code, asset_info in ASSET_MAPPING.items():
             csv_file = os.path.join(asset_collateral_dir, f"{asset_info['name']}_dune.csv")
@@ -1168,7 +1165,7 @@ def upload_to_dune(**kwargs):
                 continue
             
             df = pd.read_csv(csv_file)
-            table_name = f"{asset_info['name']}_collateral_value"
+            table_name = f"{asset_info['name']}_deposit_value"
             
             if DO_NOT_UPLOAD:
                 print(f"\nDO NOT UPLOAD: Data to be uploaded for {asset_code}:")
@@ -1183,7 +1180,7 @@ def upload_to_dune(**kwargs):
 
 def upload_to_rds(**kwargs):
     try:
-        asset_collateral_dir = os.path.join(DATA_DIR, 'asset_collateral_value')
+        asset_collateral_dir = os.path.join(DATA_DIR, 'asset_deposit_value')
         
         for asset_code, asset_info in ASSET_MAPPING.items():
             csv_file = os.path.join(asset_collateral_dir, f"{asset_info['name']}_rds.csv")
@@ -1193,7 +1190,7 @@ def upload_to_rds(**kwargs):
                 continue
                 
             df = pd.read_csv(csv_file)
-            table_name = f"{asset_info['name']}_collateral_value"
+            table_name = f"{asset_info['name']}_deposit_value"
             
             if DO_NOT_UPLOAD:
                 print(f"\nDO NOT UPLOAD: Data to be uploaded to RDS for {asset_code}:")
@@ -1239,11 +1236,11 @@ default_args = {
 }
 
 dag = DAG(
-    'sov_defillama_pipeline',
+    'sov_defillama',
     default_args=default_args,
-    description='A DAG for fetching and processing DeFiLlama data',
-    schedule_interval=timedelta(days=3),
-    start_date=datetime(2025, 2, 26, 0, 0, 0),
+    description=get_dag_config('sov_defillama')['description'],
+    schedule_interval=timedelta(days=3), # schedule_interval=get_schedule_interval('sov_defillama'),
+    start_date=datetime(2025, 6, 7, 0, 1, 0), # get_start_date('sov_defillama'),
     catchup=False
 )
 
