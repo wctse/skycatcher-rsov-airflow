@@ -9,3 +9,5 @@ ec2-airflow-keypair.pem
 __pycache__/
 sandbox.ipynb
 .cpython
+config/
+manual codes/
