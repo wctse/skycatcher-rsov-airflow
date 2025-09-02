@@ -2,7 +2,6 @@
 code_examples
 logs/
 venv/
-data/
 llm prompts/
 dags/manual_dune_to_rds.py
 ec2-airflow-keypair.pem
