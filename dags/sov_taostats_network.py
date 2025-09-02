@@ -16,6 +16,8 @@ from airflow.utils.dates import days_ago
 import time
 from requests.exceptions import RequestException
 
+from config.schedules import get_schedule_interval, get_start_date, get_dag_config
+
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
 DO_NOT_UPLOAD = False
@@ -440,11 +442,11 @@ default_args = {
 }
 
 dag = DAG(
-    'sov_taostats_network_pipeline',
+    'sov_taostats_network',
     default_args=default_args,
-    description='A DAG for fetching and processing Taostats network statistics',
-    schedule_interval=timedelta(days=3),
-    start_date=datetime(2025, 2, 26, 3, 0, 0),
+    description=get_dag_config('sov_taostats_network')['description'],
+    schedule_interval=get_schedule_interval('sov_taostats_network'),
+    start_date=get_start_date('sov_taostats_network'),
     catchup=False
 )
 

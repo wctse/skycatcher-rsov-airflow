@@ -15,6 +15,8 @@ from airflow.utils.dates import days_ago
 import time
 from requests.exceptions import RequestException
 
+from config.schedules import get_schedule_interval, get_start_date, get_dag_config
+
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
 DO_NOT_UPLOAD = False
@@ -26,7 +28,7 @@ METRICS = ['price', 'mc', 'fdv']
 ASSETS = [
     'aptos',
     'avalanche',
-    # 'bittensor' # Bittensor is not availalbe on Artemis, as well as we are using mcap for it
+    # 'bittensor' # Bittensor is not availalbe on Artemis
     'bsc',
     'celestia',
     'ethereum',
@@ -34,7 +36,8 @@ ASSETS = [
     'sei',
     'solana',
     'sui',
-    'ton'
+    'ton',
+    'hyperliquid'
 ]
 
 # Data directory
@@ -138,7 +141,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616" #"4170616" if not DEV_MODE else "4226299"
+            query_id="5270986" if not RESET_MODE else "5270978"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -401,11 +404,11 @@ default_args = {
 }
 
 dag = DAG(
-    'sov_artemis_pipeline',
+    'sov_artemis',
     default_args=default_args,
-    description='A DAG for fetching and processing Artemis price, market cap and fdv data',
-    schedule_interval=timedelta(days=3),
-    start_date=datetime(2025, 2, 26, 4, 0, 0),
+    description=get_dag_config('sov_artemis')['description'],
+    schedule_interval=get_schedule_interval('sov_artemis'),
+    start_date=get_start_date('sov_artemis'),
     catchup=False
 )
 

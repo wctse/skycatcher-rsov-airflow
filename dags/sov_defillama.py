@@ -60,7 +60,9 @@ TOKENS_CONFIG = {
     "sui": ["SUI"],
     "bnb": ["BNB", "WBNB"],
     "sei": ["SEI", "WSEI", "ISEI"],
-    "sonic": ["S", "WS", "STS"]
+    "sonic": ["S", "WS", "STS"],
+    "hyperliquid": ["HYPE", "WHYPE", "STHYPE", "LHYPE"],
+    "zora": ["ZORA"]
 }
 
 IGNORES_LIST = [
@@ -113,10 +115,13 @@ ASSET_MAPPING = {
     'tia': {'chain': 'Celestia', 'name': 'celestia'},
     'sei': {'chain': 'Sei', 'name': 'sei'},
     'tao': {'chain': 'Bittensor', 'name': 'bittensor'},
-    'sonic': {'chain': 'Sonic', 'name': 'sonic'}
+    'sonic': {'chain': 'Sonic', 'name': 'sonic'},
+    'hyperliquid': {'chain': 'Hyperliquid', 'name': 'hyperliquid'},
+    'zora': {'chain': 'Zora', 'name': 'zora'}
 }
 
 CATEGORIES_TO_IGNORE = ['Liquid Staking', 'Liquid Restaking', 'CEX', 'Yield Aggregator']
+CHAIN_SUFFIXS_TO_IGNORE = ['staking', 'pool2', 'borrowed', 'treasury', 'vesting']
 
 INTERPOLATES = [
     {
@@ -430,7 +435,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616" if not RESET_MODE else "4226299"
+            query_id="5270986" if not RESET_MODE else "5270978"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -761,7 +766,7 @@ def fetch_protocol_tvls(**kwargs):
             # Process chain TVLs
             for chain_name, chain_data in response.get('chainTvls', {}).items():
                 # Skip chains with excluded terms
-                if any(term in chain_name.lower() for term in ['staking', 'pool2', 'borrowed', 'treasury', 'vesting']):
+                if any(term in chain_name.lower() for term in CHAIN_SUFFIXS_TO_IGNORE):
                     continue
                 
                 # Process tokens and TVL data
@@ -929,7 +934,7 @@ def process_tvls(**kwargs):
                         
                         for chain, tvl_value in data.get('tvl', {}).items():
                             # Skip chains with excluded terms
-                            if any(term in chain.lower() for term in ['staking', 'pool2', 'borrowed', 'treasury', 'vesting']):
+                            if any(term in chain.lower() for term in CHAIN_SUFFIXS_TO_IGNORE):
                                 continue
                                 
                             # Only process TVL if it's from the asset's corresponding chain
@@ -948,7 +953,7 @@ def process_tvls(**kwargs):
                         tokens_in_usd = data.get('tokensInUsd', {})
                         for chain, tokens_data in tokens_in_usd.items():
                             # Skip chains with excluded terms
-                            if any(term in chain.lower() for term in ['staking', 'pool2', 'borrowed', 'treasury', 'vesting']):
+                            if any(term in chain.lower() for term in CHAIN_SUFFIXS_TO_IGNORE):
                                 continue
                                 
                             # Sum up values for matching tokens
@@ -1155,10 +1160,10 @@ def upload_to_dune(**kwargs):
     """Uploads processed data to Dune Analytics."""
     
     try:
-        asset_collateral_dir = os.path.join(DATA_DIR, 'asset_deposit_value')
+        asset_deposit_dir = os.path.join(DATA_DIR, 'asset_deposit_value')
         
         for asset_code, asset_info in ASSET_MAPPING.items():
-            csv_file = os.path.join(asset_collateral_dir, f"{asset_info['name']}_dune.csv")
+            csv_file = os.path.join(asset_deposit_dir, f"{asset_info['name']}_dune.csv")
             
             if not os.path.exists(csv_file):
                 print(f"CSV file not found for {asset_code}: {csv_file}")
@@ -1180,10 +1185,10 @@ def upload_to_dune(**kwargs):
 
 def upload_to_rds(**kwargs):
     try:
-        asset_collateral_dir = os.path.join(DATA_DIR, 'asset_deposit_value')
+        asset_deposit_dir = os.path.join(DATA_DIR, 'asset_deposit_value')
         
         for asset_code, asset_info in ASSET_MAPPING.items():
-            csv_file = os.path.join(asset_collateral_dir, f"{asset_info['name']}_rds.csv")
+            csv_file = os.path.join(asset_deposit_dir, f"{asset_info['name']}_rds.csv")
             
             if not os.path.exists(csv_file):
                 print(f"CSV file not found for {asset_code}: {csv_file}")

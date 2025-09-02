@@ -16,6 +16,8 @@ import time
 from requests.exceptions import RequestException
 import shutil
 
+from config.schedules import get_schedule_interval, get_start_date, get_dag_config
+
 # Global Development Mode Flag
 TRIM_MODE = False # Trim the amount of data fetched and processed
 RESET_MODE = False  # Ignore all previous data in Dune and RDS and start from scratch
@@ -750,11 +752,11 @@ default_args = {
 }
 
 dag = DAG(
-    'sov_taostats_subnet_pipeline',
+    'sov_taostats_subnets',
     default_args=default_args,
-    description='A DAG for fetching and processing TaoStats subnet data',
-    schedule_interval=timedelta(days=3),
-    start_date=datetime(2025, 2, 26, 2, 30, 0),
+    description=get_dag_config('sov_taostats_subnets')['description'],
+    schedule_interval=get_schedule_interval('sov_taostats_subnets'),
+    start_date=get_start_date('sov_taostats_subnets'),
     catchup=False
 )
 

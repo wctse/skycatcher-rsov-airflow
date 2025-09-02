@@ -31,34 +31,54 @@ from sqlalchemy import create_engine, text
 from dune_client.client import DuneClient
 from dune_client.query import QueryBase
 
+from config.schedules import get_schedule_interval, get_start_date, get_dag_config
+
 # ------------------------------------------------------------------------------------
 # Global settings
 # ------------------------------------------------------------------------------------
 
 CONFIGS = [
-    {
-        "rds_table_name": "eth_staking_value_dune_constructed",
-        "type": "query",
-        "query_id": 4480493,
-        "date_column": "date",
-    },
-    {
-        "rds_table_name": "sol_staking_value_dune_21co",
-        "type": "query",
-        "query_id": 4460227,
-        "date_column": "day",
-    },
+    # {
+    #     "rds_table_name": "eth_staking_value_dune_constructed",
+    #     "type": "query",
+    #     "query_id": 4480493,
+    #     "date_column": "date",
+    # },
+    # {
+    #     "rds_table_name": "sol_staking_value_dune_21co",
+    #     "type": "query",
+    #     "query_id": 4460227,
+    #     "date_column": "day",
+    # },
     {
         "rds_table_name": "prices_usd_daily",
         "type": "query",
         "query_id": 4504144,
         "date_column": "day",
     },
+    # {
+    #     "rds_table_name": "sonic_staking_value_dune_constructed",
+    #     "type": "query",
+    #     "query_id": 4794474,
+    #     "date_column": "date",
+    # }
     {
-        "rds_table_name": "sonic_staking_value_dune_constructed",
+        "rds_table_name": "aero_buybacks_newlocks",
         "type": "query",
-        "query_id": 4794474,
-        "date_column": "date",
+        "query_id": 4632140,
+        "date_column": "t",
+    },
+    {
+        "rds_table_name": "aero_emission_vs_locked_epoch_breakdown",
+        "type": "query",
+        "query_id": 4713644,
+        "date_column": "epoch",
+    },
+    {
+        "rds_table_name": "aero_price_total_supply",
+        "type": "query",
+        "query_id": 5326587,
+        "date_column": "day",
     }
 ]
 
@@ -317,9 +337,9 @@ default_args = {
 dag = DAG(
     dag_id='dune_to_rds',
     default_args=default_args,
-    description='Fetch data from Dune (query or matview), slice by RDS date, and upload. Uses dune_client and a config-based approach.',
-    schedule_interval=timedelta(days=3),
-    start_date=datetime(2025, 1, 6, 5, 0, 0),
+    description=get_dag_config('dune_to_rds')['description'],
+    schedule_interval=get_schedule_interval('dune_to_rds'),
+    start_date=get_start_date('dune_to_rds'),
     catchup=False,
     max_active_runs=1
 )

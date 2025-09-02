@@ -16,6 +16,8 @@ from airflow.exceptions import AirflowException
 from airflow.hooks.base import BaseHook
 from airflow.operators.python import PythonOperator
 
+from config.schedules import get_schedule_interval, get_start_date, get_dag_config
+
 # ---------------- Global Flags ---------------- #
 RESET_MODE = False
 DO_NOT_UPLOAD = False
@@ -436,9 +438,9 @@ default_args = {
 with DAG(
     'apys_defillama_pipeline',
     default_args=default_args,
-    description='Incrementally fetch, process, and upload DefiLlama pool APYs with metadata fetching, reset and do-not-upload flags',
-    schedule_interval=timedelta(days=1),
-    start_date=datetime(2025, 3, 2, 8, 0, 0),
+    description=get_dag_config('apys_defillama')['description'],
+    schedule_interval=get_schedule_interval('apys_defillama'),
+    start_date=get_start_date('apys_defillama'),
     catchup=False,
     max_active_runs=1,
 ) as dag:
@@ -469,8 +471,4 @@ with DAG(
         python_callable=upload_to_rds,
     )
 
-    # Set dependencies:
-    # - get_latest_rds_date and fetch_metadata can run in parallel.
-    # - fetch_pool_yield_data depends on fetch_metadata.
-    # - process_apys_data then upload new rows.
     [get_latest_rds_date_task, fetch_metadata_task] >> fetch_pool_yield_data_task >> process_apys_data_task >> upload_to_rds_task

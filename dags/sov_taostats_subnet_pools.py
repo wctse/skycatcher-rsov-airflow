@@ -16,6 +16,8 @@ TRIM_MODE = False      # Trim the amount of data fetched and processed
 RESET_MODE = False     # Ignore all previous data in Dune and RDS and start from scratch
 DO_NOT_UPLOAD = False
 
+from config.schedules import get_schedule_interval, get_start_date, get_dag_config
+
 # Configuration
 # Endpoints for pool history and subnet list
 API_ENDPOINTS = {
@@ -484,11 +486,11 @@ default_args = {
 }
 
 dag = DAG(
-    'sov_taostats_subnet_pools_pipeline',
+    'sov_taostats_subnet_pools',
     default_args=default_args,
-    description='A DAG for fetching, processing and uploading pool history data',
-    schedule_interval=timedelta(days=3),
-    start_date=datetime(2025, 2, 26, 5, 30, 0),
+    description=get_dag_config('sov_taostats_subnet_pools')['description'],
+    schedule_interval=get_schedule_interval('sov_taostats_subnet_pools'),
+    start_date=get_start_date('sov_taostats_subnet_pools'),
     catchup=False
 )
 

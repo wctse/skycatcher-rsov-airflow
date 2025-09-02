@@ -15,6 +15,8 @@ from airflow.utils.dates import days_ago
 import time
 from requests.exceptions import RequestException
 
+from config.schedules import get_schedule_interval, get_start_date, get_dag_config
+
 # Global Development Mode Flag
 DEV_MODE = False  # Set to False for production
 DO_NOT_UPLOAD = False
@@ -39,13 +41,14 @@ BLOCKCHAINS = {
     'celestia': 'celestia',
     'sui': 'sui',
     'binance-smart-chain': 'binance',
-    'sei-network': 'sei'
+    'sei-network': 'sei',
+    'hyperliquid': 'hyperliquid'
 }
 METRICS = [
     'reward_rate',
     'real_reward_rate',
     'inflation_rate',
-    # 'price', -- using dune prices
+    # 'price', -- using dune or artemis prices
     'staked_tokens',
     'staking_ratio',
     'marketcap',
@@ -128,7 +131,7 @@ def fetch_dune_table_dates(**kwargs):
         dune = DuneClient(api_key)
         query = QueryBase(
             name="Sample Query",
-            query_id="4170616" if not RESET_MODE else "4226299"
+            query_id="5270986" if not RESET_MODE else "5270978"
         )
         results = dune.run_query(query)
         df = pd.DataFrame(results.result.rows)
@@ -337,7 +340,7 @@ def fetch_metadata(**kwargs):
                 print(f"Processing {blockchain_name} - {metric}")
                 
                 table_name = f"{blockchain_name}_staking"
-                start_date = start_dates_df.loc[table_name] if table_name in start_dates_df.index else None
+                start_date = start_dates_df.loc[table_name] if table_name in start_dates_df.index else datetime(2010, 1, 1)
                 end_date = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
                 
                 days_since_start = (datetime.now() - start_date).days
@@ -577,6 +580,10 @@ def process_metrics(**kwargs):
                         print(f"Filling missing column with 0: {metric}")
                         df[metric] = 0
 
+                if DEV_MODE:
+                    print("dune_dates:\n", dune_dates)
+                    print("rds_dates:\n", rds_dates)
+
                 df_dune = df[df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d') > dune_dates.loc[blockchain_name + '_staking'])].copy()
                 df_rds = df[df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d') > rds_dates.loc[blockchain_name + '_staking'])].copy()
 
@@ -688,11 +695,11 @@ default_args = {
 }
 
 dag = DAG(
-    'sov_staking_rewards_pipeline',
+    'sov_staking_rewards',
     default_args=default_args,
-    description='A DAG for fetching and processing Staking Rewards data',
-    schedule_interval=timedelta(days=3),
-    start_date=datetime(2025, 2, 26, 3, 30, 0),
+    description=get_dag_config('sov_staking_rewards')['description'],
+    schedule_interval=get_schedule_interval('sov_staking_rewards'),
+    start_date=get_start_date('sov_staking_rewards'),
     catchup=False
 )
 
