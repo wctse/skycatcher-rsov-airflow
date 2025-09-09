@@ -38,30 +38,30 @@ from config.schedules import get_schedule_interval, get_start_date, get_dag_conf
 # ------------------------------------------------------------------------------------
 
 CONFIGS = [
-    # {
-    #     "rds_table_name": "eth_staking_value_dune_constructed",
-    #     "type": "query",
-    #     "query_id": 4480493,
-    #     "date_column": "date",
-    # },
-    # {
-    #     "rds_table_name": "sol_staking_value_dune_21co",
-    #     "type": "query",
-    #     "query_id": 4460227,
-    #     "date_column": "day",
-    # },
+    {
+        "rds_table_name": "eth_staking_value_dune_constructed",
+        "type": "query",
+        "query_id": 4480493,
+        "date_column": "date",
+    },
+    {
+        "rds_table_name": "sol_staking_value_dune_21co",
+        "type": "query",
+        "query_id": 4460227,
+        "date_column": "day",
+    },
     {
         "rds_table_name": "prices_usd_daily",
         "type": "query",
         "query_id": 4504144,
         "date_column": "day",
     },
-    # {
-    #     "rds_table_name": "sonic_staking_value_dune_constructed",
-    #     "type": "query",
-    #     "query_id": 4794474,
-    #     "date_column": "date",
-    # }
+    {
+        "rds_table_name": "sonic_staking_value_dune_constructed",
+        "type": "query",
+        "query_id": 4794474,
+        "date_column": "date",
+    }
     {
         "rds_table_name": "aero_buybacks_newlocks",
         "type": "query",
