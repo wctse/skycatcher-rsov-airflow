@@ -1,0 +1,400 @@
+,parentProtocolSlug,amountUsd,name,childSlugs
+0,40-acres,4850937.600006422,['40 Acres'],['40-acres']
+1,9summits,19878280.795760404,['9Summits'],['9summits']
+2,aave,2359881023.1084895,"['Aave V3', 'Aave V2', 'Aave V3', 'Aave V2', 'Aave V3']","['aave-v3', 'aave-v2', 'aave-v3', 'aave-v2', 'aave-v3']"
+3,abracadabra,7384187.579199956,"['MIM Swap', 'MIM Swap']","['mim-swap', 'mim-swap']"
+4,across,6800985.174289517,"['Across', 'Across']","['across', 'across']"
+5,acryptos,10564758.26,['ACryptoS'],['acryptos']
+6,adrena-protocol,3230801.5447116587,['Adrena Protocol'],['adrena-protocol']
+7,aera,65298351.223383434,"['Aera V2', 'Aera V3']","['aera-v2', 'aera-v3']"
+8,aerodrome,172311192.13754818,"['Aerodrome Slipstream', 'Aerodrome V1', 'Aerodrome Slipstream']","['aerodrome-slipstream', 'aerodrome-v1', 'aerodrome-slipstream']"
+9,aevo,26004853.336516283,['Aevo Perps'],['aevo-perps']
+10,alien-base,1302408.1586761991,['Alien Base V3'],['alien-base-v3']
+11,allbridge,42951379.80707654,"['Allbridge Core', 'Allbridge Classic', 'Allbridge Core']","['allbridge-core', 'allbridge-classic', 'allbridge-core']"
+12,almanak,39587473.79821256,"['Almanak', 'Almanak']","['almanak', 'almanak']"
+13,alpaca-finance,8324944.015884505,"['Alpaca Finance 2.0', 'Alpaca Leveraged Yield Farming']","['alpaca-finance-2.0', 'alpaca-leveraged-yield-farming']"
+14,alphafi,9018396.941439135,['AlphaFi Agg'],['alphafi-agg']
+15,alphaping,19324108.81352731,['AlphaPing'],['alphaping']
+16,ambient,2458441.678976237,['Ambient'],['ambient']
+17,anemoy-capital,337141467.23744714,['Anemoy Capital'],['anemoy-capital']
+18,angle,1084687.4663826653,['Angle'],['angle']
+19,angstrom,2859750.486637232,['Angstrom'],['angstrom']
+20,apex-protocol,16767859.324549126,"['ApeX Pro', 'Apex Omni', 'Apex Omni']","['apex-pro', 'apex-omni', 'apex-omni']"
+21,apostro,6276560.934096221,['Apostro'],['apostro']
+22,aquarius-stellar,27949662.5755942,['Aquarius Stellar'],['aquarius-stellar']
+23,arbitrum-bridge,78187675.04245889,['Arbitrum Bridge'],['arbitrum-bridge']
+24,arcadia-finance,3503642.2048783535,['Arcadia V2'],['arcadia-v2']
+25,aries-markets,20399534.695573643,"['Aries Markets', 'Aries Markets']","['aries-markets', 'aries-markets']"
+26,arkis,2728179.2621503086,['Arkis'],['arkis']
+27,arrakis-finance,60653761.26636332,"['Arrakis V2', 'Arrakis Modular', 'Arrakis V1']","['arrakis-v2', 'arrakis-modular', 'arrakis-v1']"
+28,aster,27143634.42610764,"['APX Finance', 'Aster Perps', 'APX Finance']","['apx-finance', 'aster-perps', 'apx-finance']"
+29,astroport,10715385.745308105,['Astroport'],['astroport']
+30,aura,4879419.429546143,['Aura'],['aura']
+31,avalanche-core-bridge,66761937.2576419,"['Avalanche Core Bridge', 'Avalanche Core Bridge']","['avalanche-core-bridge', 'avalanche-core-bridge']"
+32,avantis,22801289.7343033,['Avantis'],['avantis']
+33,awaken-swap,7761767.54394,['Awaken Swap'],['awaken-swap']
+34,axelar-network,25995144.097333793,"['Axelar', 'Axelar']","['axelar', 'axelar']"
+35,azuro,1194344.756007,['Azuro'],['azuro']
+36,b.protocol-curator,139680713.29733622,['B.Protocol Curator'],['b.protocol-curator']
+37,babyswap,1237999.8784615337,['BabySwap'],['babyswap']
+38,balancer,5339426.469960401,['Balancer V2'],['balancer-v2']
+39,base-bridge,36415756.62812963,"['Base Bridge', 'Base Bridge']","['base-bridge', 'base-bridge']"
+40,beefy,320019190.096721,['Beefy'],['beefy']
+41,benqi,5344448.318032,['Benqi Lending'],['benqi-lending']
+42,binaryx-platform,5997270.340768784,['Binaryx Platform'],['binaryx-platform']
+43,biswap,5076899.853792873,['Biswap V2'],['biswap-v2']
+44,bitlayer-bridge,7500000.0,['Bitlayer Bridge'],['bitlayer-bridge']
+45,bitu-protocol,3706801.1050017984,['BitU Protocol'],['bitu-protocol']
+46,blackhole,18232336.597529,"['Blackhole AMM', 'Blackhole CLMM']","['blackhole-amm', 'blackhole-clmm']"
+47,blend,2004402.3249817837,['Blend Pools V2'],['blend-pools-v2']
+48,block-analitica,64468464.95632288,['Block Analitica'],['block-analitica']
+49,bluefin,56539215.27087122,"['AlphaLend', 'Bluefin Pro', 'Bluefin Spot', 'AlphaLend', 'Bluefin Spot']","['alphalend', 'bluefin-pro', 'bluefin-spot', 'alphalend', 'bluefin-spot']"
+50,boba-bridge,1441431.3913243664,['Boba Bridge'],['boba-bridge']
+51,bonzo-finance,5278691.472455808,['Bonzo Finance'],['bonzo-finance']
+52,bouncebit-cedefi-yield,37728727.918338485,['BounceBit CeDeFi Yield'],['bouncebit-cedefi-yield']
+53,brickken,35256232.42524412,"['Brickken', 'Brickken']","['brickken', 'brickken']"
+54,bucket-protocol,9147018.219606895,"['Bucket CDP', 'Bucket CDP']","['bucket-cdp', 'bucket-cdp']"
+55,bulbaswap,1688923.3449704656,['BulbaSwap V2'],['bulbaswap-v2']
+56,bunni,14989355.887657342,"['Bunni V2', 'Bunni V2']","['bunni-v2', 'bunni-v2']"
+57,butter-network,1494875.3865364082,['Butter Network'],['butter-network']
+58,byreal,1334184.8489491225,['Byreal'],['byreal']
+59,camelot,11636420.826097988,['Camelot V3'],['camelot-v3']
+60,cap,81942743.52181143,['cap'],['cap']
+61,carbon-defi,1019403.3455573365,['Carbon Defi'],['carbon-defi']
+62,carrot,21398447.07953768,"['Carrot Liquidity', 'Carrot Liquidity']","['carrot-liquidity', 'carrot-liquidity']"
+63,cbridge,12926376.969446208,"['cBridge', 'cBridge']","['cbridge', 'cbridge']"
+64,centrifuge,947233038.268346,['Centrifuge Protocol'],['centrifuge-protocol']
+65,cetus,24284528.771875646,"['Cetus AMM', 'Cetus AMM']","['cetus-amm', 'cetus-amm']"
+66,chain-fusion,4005792.823896044,"['Chain Fusion', 'Chain Fusion']","['chain-fusion', 'chain-fusion']"
+67,chainflip,2246094.90092308,['Chainflip'],['chainflip']
+68,chainge-finance,4368533.858375478,"['Chainge Finance', 'Chainge Finance']","['chainge-finance', 'chainge-finance']"
+69,clearstar,7187944.519113129,['Clearstar'],['clearstar']
+70,coinwind,129836226.83467437,"['Coinwind', 'Coinwind']","['coinwind', 'coinwind']"
+71,colend-protocol,1897730.7312942059,['Colend Protocol'],['colend-protocol']
+72,cometa,1673988.968481,['Cometa'],['cometa']
+73,compound-blue,3825646.6508263703,['Compound Blue'],['compound-blue']
+74,compound-finance,146692316.4479139,"['Compound V2', 'Compound V3', 'Compound V3', 'Compound V2']","['compound-v2', 'compound-v3', 'compound-v3', 'compound-v2']"
+75,core-bridge,3834752.937055939,"['CORE Bridge', 'CORE Bridge']","['core-bridge', 'core-bridge']"
+76,cronos-zkevm-bridge,2463749.122460459,['Cronos zkEVM Bridge'],['cronos-zkevm-bridge']
+77,curve-finance,327225691.0876489,"['Curve DEX', 'Curve DEX', 'Curve DEX']","['curve-dex', 'curve-dex', 'curve-dex']"
+78,d2-finance,6270056.174273958,['D2 Finance'],['d2-finance']
+79,daoaas,10189446.370952075,['DAOaaS'],['daoaas']
+80,deepbook,5835748.5563860815,['DeepBook V3'],['deepbook-v3']
+81,defi-saver,1539067.405459958,['Defi Saver'],['defi-saver']
+82,defituna,11685172.031360954,"['DefiTuna AMM', 'DefiTuna Lending']","['defituna-amm', 'defituna-lending']"
+83,deri,1176326.545027783,['Deri V4'],['deri-v4']
+84,derive,1409255.0589837502,['Derive V2'],['derive-v2']
+85,desyn-protocol,3507655.518023688,['DeSyn Basis Trading'],['desyn-basis-trading']
+86,dexalot,3277266.655895657,"['Dexalot DEX', 'Dexalot Portfolio']","['dexalot-dex', 'dexalot-portfolio']"
+87,dinero,1060870.4360008608,['Hidden Hand'],['hidden-hand']
+88,dodo,5521158.845206482,"['DODO AMM', 'DODO AMM']","['dodo-amm', 'dodo-amm']"
+89,dolomite,5378531.905150536,['Dolomite'],['dolomite']
+90,dooar,4906930.649416529,['DOOAR'],['dooar']
+91,dragon-swap-sei,8023585.938279224,['Dragon Swap V3 Sei'],['dragon-swap-v3-sei']
+92,dragonswap-kaia,1351368.2452189343,['DragonSwap V3 Kaia'],['dragonswap-v3-kaia']
+93,drift,80682325.59955363,"['Drift Trade', 'Drift Trade']","['drift-trade', 'drift-trade']"
+94,dydx,298177102.02039146,"['dYdX V3', 'dYdX V4']","['dydx-v3', 'dydx-v4']"
+95,echelon-market,13326280.22282949,"['Echelon Market', 'Echelon Market']","['echelon-market', 'echelon-market']"
+96,edgex,65509785.51473267,['edgeX Bridge'],['edgex-bridge']
+97,ekubo,13971953.79378439,"['Ekubo', 'Ekubo']","['ekubo', 'ekubo']"
+98,elfi-protocol,2366273.278155988,['ELFi Protocol'],['elfi-protocol']
+99,enibridge,2657398.0013,['ENIBridge'],['enibridge']
+100,enzyme-finance,8057529.724481989,"['Enzyme Finance', 'Enzyme Finance']","['enzyme-finance', 'enzyme-finance']"
+101,estate-protocol,7110787.35312,['Estate Protocol'],['estate-protocol']
+102,ethena,1229561958.7285619,"['Ethena USDe', 'Ethena tsUSDe']","['ethena-usde', 'ethena-tsusde']"
+103,ether.fi,40439510.95142975,['ether.fi Liquid'],['ether.fi-liquid']
+104,etherex,140368376.05166385,"['Etherex Legacy', 'Etherex CL', 'Etherex Legacy', 'Etherex CL']","['etherex-legacy', 'etherex-cl', 'etherex-legacy', 'etherex-cl']"
+105,etherfi-cash,3282509.890299176,['EtherFi Borrowing Market'],['etherfi-borrowing-market']
+106,euler,113434739.3924753,"['Euler V2', 'Euler V2']","['euler-v2', 'euler-v2']"
+107,euler-dao,361895656.1094699,"['Euler DAO', 'Euler DAO']","['euler-dao', 'euler-dao']"
+108,everdex,1017141.4882078703,['Everdex'],['everdex']
+109,exponent,5548124.218475978,['Exponent'],['exponent']
+110,extended,36810788.794712916,['Extended'],['extended']
+111,extra-finance,37376549.60632168,"['Extra Finance Vaults', 'Extra Finance Leverage Farming']","['extra-finance-vaults', 'extra-finance-leverage-farming']"
+112,ferro,7317009.326203734,"['Ferro', 'Ferro']","['ferro', 'ferro']"
+113,figure-markets,130072343.07099682,"['Figure Markets Democratized Prime', 'Figure Markets Exchange', 'Figure Markets Exchange']","['figure-markets-democratized-prime', 'figure-markets-exchange', 'figure-markets-exchange']"
+114,flamingo-finance,13927513.811724141,['Flamingo Finance'],['flamingo-finance']
+115,flashtrade,6398838.819530843,['FlashTrade'],['flashtrade']
+116,flowx-finance,4556930.652751462,"['FlowX V3', 'FlowX V3']","['flowx-v3', 'flowx-v3']"
+117,fluid,160052970.37376451,"['Fluid Lending', 'Fluid Lending']","['fluid-lending', 'fluid-lending']"
+118,flux-finance,1552895.764995,['Flux Finance'],['flux-finance']
+119,folks-finance,48561157.258537,['Folks Finance Lending'],['folks-finance-lending']
+120,football.fun,5026649.591635999,['Football.Fun'],['football.fun']
+121,francium,10848000.0,['Francium'],['francium']
+122,fstswap,26767024.499714512,['FstSwap'],['fstswap']
+123,fuel-bridge,3225663.142232966,['Fuel Bridge'],['fuel-bridge']
+124,fulcrom,11366688.353325687,"['Fulcrom Perps', 'Fulcrom Perps']","['fulcrom-perps', 'fulcrom-perps']"
+125,fx-protocol,5228253.6932645105,['fx Protocol'],['fx-protocol']
+126,gaib,44402325.48864618,"['GAIB', 'GAIB']","['gaib', 'gaib']"
+127,gains-network,20145673.18068371,['Gains Network'],['gains-network']
+128,gammaswap-protocol,5226828.519858477,"['DeltaSwap', 'GammaSwap']","['deltaswap', 'gammaswap']"
+129,gauntlet,408466438.3694321,"['Gauntlet', 'Gauntlet']","['gauntlet', 'gauntlet']"
+130,gearbox,8699152.01809593,['Gearbox'],['gearbox']
+131,gemswap-by-golden-swan-solutions,2358807.9086623266,['GemSwap by Golden Swan Solutions'],['gemswap-by-golden-swan-solutions']
+132,gmx,188484841.16196045,['GMX V2 Perps'],['gmx-v2-perps']
+133,goblin,3484995.223371636,"['Goblin', 'Goblin']","['goblin', 'goblin']"
+134,gold-dao,1187806.55982,['Gold DAO'],['gold-dao']
+135,goose,9463783.69421691,['Goose'],['goose']
+136,goplus-security,1607566.467659939,['GoPlus Locker V3'],['goplus-locker-v3']
+137,gravity-bridge,4875446.619098043,['Gravity Bridge'],['gravity-bridge']
+138,growihf,3129967.29887266,['GrowiHF'],['growihf']
+139,grvt,8491070.775131,['GRVT'],['grvt']
+140,haedal,2173801.9169645244,['Haedal Vault'],['haedal-vault']
+141,hakutora,43046824.72428022,"['Hakutora', 'Hakutora']","['hakutora', 'hakutora']"
+142,hanji-protocol,1634699.225470585,['Hanji Protocol'],['hanji-protocol']
+143,harvest-finance,14684166.177200485,['Harvest Finance'],['harvest-finance']
+144,hbarsuite,3047235.0,['HbarSuite'],['hbarsuite']
+145,helix,26243703.178037,['Helix Perp'],['helix-perp']
+146,homora-v2,2359523.511662906,"['Homora V2', 'Homora V2']","['homora-v2', 'homora-v2']"
+147,honeypop-dex,1428378.3602924547,['Honeypop DEX'],['honeypop-dex']
+148,hubble,1214681.829684007,['Hubble'],['hubble']
+149,hydro,5296268.835812,['Hydro Lending'],['hydro-lending']
+150,hyperion,38065077.91109721,"['Hyperion', 'Hyperion']","['hyperion', 'hyperion']"
+151,hyperithm,154065668.2175004,"['Hyperithm', 'Hyperithm']","['hyperithm', 'hyperithm']"
+152,hyperliquid,759388255.7158927,"['Hyperliquid Spot Orderbook', 'Hyperliquid HLP']","['hyperliquid-spot-orderbook', 'hyperliquid-hlp']"
+153,hyperliquid-bridge,5412035777.786846,['Hyperliquid Bridge'],['hyperliquid-bridge']
+154,hyperwave,32188548.360808674,['HyperWave'],['hyperwave']
+155,icdex,1187102.327587,['ICDex'],['icdex']
+156,ichi,5310848.3059898345,"['ICHI', 'ICHI']","['ichi', 'ichi']"
+157,idle,45048977.5665331,['Idle'],['idle']
+158,immutable-zkevm,2927110.8368784836,['Immutable zkEVM'],['immutable-zkevm']
+159,infinifi,113278155.17275614,['infiniFi'],['infinifi']
+160,init-capital,1242406.421656038,['INIT Capital'],['init-capital']
+161,initiadex,11726026.708383983,['InitiaDEX'],['initiadex']
+162,injective-bridge,25524120.538076,['Injective Bridge'],['injective-bridge']
+163,intentx,2288051.9084499967,['IntentX'],['intentx']
+164,iotube,3700750.864637503,"['ioTube', 'ioTube']","['iotube', 'iotube']"
+165,ipor-protocol,9596996.13329102,['IPOR Fusion'],['ipor-fusion']
+166,iron-bank,3497505.7979589016,"['Iron Bank', 'Iron Bank']","['iron-bank', 'iron-bank']"
+167,jupiter,338815106.9273941,"['Jupiter Lend', 'Jupiter Perpetual Exchange', 'Jupiter Lend']","['jupiter-lend', 'jupiter-perpetual-exchange', 'jupiter-lend']"
+168,justlend,54450533.215008,['JustLend'],['justlend']
+169,k2,1229655.6618709734,['K2'],['k2']
+170,k3-capital,41076881.03398775,['K3 Capital'],['k3-capital']
+171,kai-finance,17770108.722879995,"['Kai Finance', 'Kai Finance']","['kai-finance', 'kai-finance']"
+172,kamino,176331999.0134159,"['Kamino Lend', 'Kamino Lend', 'Kamino Lend']","['kamino-lend', 'kamino-lend', 'kamino-lend']"
+173,karak-protocol,8922033.022353321,['Karak'],['karak']
+174,katana-pre-launch,13380850.82736513,"['Katana Pre-Launch', 'Katana Pre-Launch']","['katana-pre-launch', 'katana-pre-launch']"
+175,katana-ronin-dex,4888836.21702271,"['Katana DEX V3', 'Katana DEX']","['katana-dex-v3', 'katana-dex']"
+176,kava-lend,1370245.465047,['Kava Lend'],['kava-lend']
+177,kava-mint,6826967.48053,['Kava Mint'],['kava-mint']
+178,kiloex,3776242.3770007733,"['KiloEx', 'KiloEx']","['kiloex', 'kiloex']"
+179,kyo-finance,1154542.2559951278,['Kyo Finance'],['kyo-finance']
+180,lagoon,53895173.75058926,"['Lagoon', 'Lagoon']","['lagoon', 'lagoon']"
+181,landx-finance,2027543.5314032976,['LandX Finance'],['landx-finance']
+182,lfj,3261269.902794,['Joe V2.2'],['joe-v2.2']
+183,lifinity,6543426.319485937,"['Lifinity V2', 'Lifinity V2']","['lifinity-v2', 'lifinity-v2']"
+184,lighter-v2,375030772.38402796,['Lighter V2'],['lighter-v2']
+185,linea-bridge,67856872.031499,['Linea Bridge'],['linea-bridge']
+186,liqwid,2452487.104866567,['Liqwid'],['liqwid']
+187,lista-dao,8446004.869450698,['Lista Lending'],['lista-lending']
+188,llamapay,2012992.1249628854,['LlamaPay'],['llamapay']
+189,lofty,98158383.42,['Lofty'],['lofty']
+190,loopring,1846057.811921916,['Loopring'],['loopring']
+191,loopscale,1825728.9610589598,['Loopscale'],['loopscale']
+192,lulo,89199314.44476052,['Lulo'],['lulo']
+193,lumenswap,14341802.0,['LumenSwap'],['lumenswap']
+194,m0,360112241.1010573,['M0'],['m0']
+195,macaron,1283534.24305,['Macaron AMM'],['macaron-amm']
+196,magma,11473290.018823821,"['Magma', 'Magma']","['magma', 'magma']"
+197,magpie-ecosystem,2385353.5244694212,['Radpie'],['radpie']
+198,manta-pacific,7472918.894268514,"['Manta Pacific', 'Manta Pacific']","['manta-pacific', 'manta-pacific']"
+199,mantle-bridge,506912848.55325043,"['Mantle Bridge', 'Mantle Bridge']","['mantle-bridge', 'mantle-bridge']"
+200,maple-finance,2184877221.388735,"['Maple', 'Maple']","['maple', 'maple']"
+201,marginfi,14914492.327397369,"['marginfi Lending', 'marginfi Lending']","['marginfi-lending', 'marginfi-lending']"
+202,mars-protocol,1357512.9588595245,['Mars Lend'],['mars-lend']
+203,maverick-protocol,3866369.36690128,"['Maverick V2', 'Maverick V2']","['maverick-v2', 'maverick-v2']"
+204,mento,1262194.805193,['Mento'],['mento']
+205,merchant-moe,15415906.705027325,"['Merchant Moe Liquidity Book', 'Merchant Moe Liquidity Book']","['merchant-moe-liquidity-book', 'merchant-moe-liquidity-book']"
+206,merkle-trade,5001484.883748889,['Merkle Trade'],['merkle-trade']
+207,metalx,60614981.482016,"['MetalX Dex', 'MetalX Swap', 'MetalX Lending']","['metalx-dex', 'metalx-swap', 'metalx-lending']"
+208,meteora,312356603.2821408,"['Meteora DAMM V1', 'Meteora vaults', 'Meteora DLMM', 'Meteora vaults', 'Meteora DLMM']","['meteora-damm-v1', 'meteora-vaults', 'meteora-dlmm', 'meteora-vaults', 'meteora-dlmm']"
+209,metis-bridge,16363711.251070503,"['Metis Bridge', 'Metis Bridge']","['metis-bridge', 'metis-bridge']"
+210,mev-capital,306557524.76907676,"['MEV Capital', 'MEV Capital']","['mev-capital', 'mev-capital']"
+211,mira-protocol,1629438.6058006175,['Mira Protocol'],['mira-protocol']
+212,mitosis,195840653.48406196,['Mitosis'],['mitosis']
+213,moar-market,1177477.8782260988,['Moar Market'],['moar-market']
+214,mode-bridge,1658404.3509533068,['Mode Bridge'],['mode-bridge']
+215,mole,9498252.61803917,['Mole'],['mole']
+216,momentum,74742094.71444747,"['Momentum', 'Momentum']","['momentum', 'momentum']"
+217,moon-swap,2181545.826434,['Moon Swap'],['moon-swap']
+218,moonlander,32716956.86781231,['Moonlander'],['moonlander']
+219,moonwell,71594889.53759548,"['Moonwell Lending', 'Moonwell Vaults']","['moonwell-lending', 'moonwell-vaults']"
+220,morph-bridge,4189987.382119,['Morph Bridge'],['morph-bridge']
+221,morpho,307106826.7649615,"['Morpho Blue', 'Morpho Blue', 'Morpho Blue']","['morpho-blue', 'morpho-blue', 'morpho-blue']"
+222,multichain,7057504.30297189,"['Multichain', 'Multichain']","['multichain', 'multichain']"
+223,multipli.fi,56107917.80409522,"['Multipli.fi', 'Multipli.fi']","['multipli.fi', 'multipli.fi']"
+224,mux-protocol,1544386.697929169,['MUX Perps'],['mux-perps']
+225,myx-finance,1749196.5954147042,['MYX Finance'],['myx-finance']
+226,namada-shielded-pools,1123076.3406357004,['Namada Shielded Pools'],['namada-shielded-pools']
+227,native,1301034.5836685544,['Native Credit Pool'],['native-credit-pool']
+228,navi-protocol,9860552.388947105,"['NAVI Lending', 'NAVI Lending']","['navi-lending', 'navi-lending']"
+229,nemo,11519340.115167009,"['Nemo Yield Trading', 'Nemo Vault']","['nemo-yield-trading', 'nemo-vault']"
+230,neutral-trade,32312195.487714563,['Neutral Trade'],['neutral-trade']
+231,nirvana,3600000.2609646954,['Nirvana V2'],['nirvana-v2']
+232,nostra,1178646.058614256,['Nostra Money Market'],['nostra-money-market']
+233,nucleus,5290844.310958281,['Nucleus'],['nucleus']
+234,nx-finance,2205613.2924328116,['NX Finance'],['nx-finance']
+235,odyssey-finance,12314076.0,['Odyssey Finance'],['odyssey-finance']
+236,omnibtc,1003573.3168956958,['OmniBTC'],['omnibtc']
+237,omniyield,2434159.635551,['OmniYield'],['omniyield']
+238,onre,25297018.618045863,['OnRe'],['onre']
+239,openeden,3362554.9874007623,['OpenEden USDO'],['openeden-usdo']
+240,optimism-bridge,259334498.79798487,"['Optimism Bridge', 'Optimism Bridge']","['optimism-bridge', 'optimism-bridge']"
+241,orbit-bridge,3131785.20453219,['Orbit Bridge'],['orbit-bridge']
+242,orca,116870680.00672036,"['Orca DEX', 'Orca DEX', 'Orca DEX', 'Orca DEX']","['orca-dex', 'orca-dex', 'orca-dex', 'orca-dex']"
+243,orderly,39870349.78749881,"['Orderly Bridge', 'Orderly Bridge']","['orderly-bridge', 'orderly-bridge']"
+244,origin-protocol,8351032.725912592,"['Origin Dollar', 'Origin Dollar']","['origin-dollar', 'origin-dollar']"
+245,origyn,51300960.0,['ORIGYN'],['origyn']
+246,osmosis-dex,5434938.345759213,['Osmosis DEX'],['osmosis-dex']
+247,ostium,43401675.499111585,['Ostium'],['ostium']
+248,ouroboros-capital,14008703.909366788,['Ouroboros Capital'],['ouroboros-capital']
+249,overnight-finance,8974280.086645886,['Overnight Finance'],['overnight-finance']
+250,overtime,1041919.7882878983,['Overtime'],['overtime']
+251,pancakeswap,1865501880.7752438,"['PancakeSwap AMM', 'PancakeSwap Infinity', 'PancakeSwap AMM V3', 'PancakeSwap Infinity', 'PancakeSwap StableSwap', 'PancakeSwap AMM V3', 'PancakeSwap AMM']","['pancakeswap-amm', 'pancakeswap-infinity', 'pancakeswap-amm-v3', 'pancakeswap-infinity', 'pancakeswap-stableswap', 'pancakeswap-amm-v3', 'pancakeswap-amm']"
+252,pando,42759153.793197,"['Pando Rings', 'Pando Leaf']","['pando-rings', 'pando-leaf']"
+253,paradex,78869297.83669694,['Paradex Bridge'],['paradex-bridge']
+254,parcl,6995161.204537466,['Parcl V3'],['parcl-v3']
+255,pareto-credit,90777437.8669931,['Pareto Credit'],['pareto-credit']
+256,parrot-protocol,4042944.315448415,['Parrot Protocol'],['parrot-protocol']
+257,pay-protocol,3114001.2067370703,['Pay Protocol'],['pay-protocol']
+258,peapods-finance,2728027.3955034176,['Peapods Finance'],['peapods-finance']
+259,perena,14098098.682667714,"['Perena', 'Perena', 'Perena']","['perena', 'perena', 'perena']"
+260,pharaoh-exchange,2654565.143447,['Pharaoh CL'],['pharaoh-cl']
+261,phoenix,2847510.527806739,['Phoenix'],['phoenix']
+262,phoenix-defi-hub,5254052.870994,['Phoenix DeFi Hub'],['phoenix-defi-hub']
+263,pickle,2116422.335519329,['Pickle'],['pickle']
+264,pinksale,60621958.32858861,['PinkSale'],['pinksale']
+265,pnetwork,13099805.903342,['pNetwork'],['pnetwork']
+266,polygon-bridge-&-staking,449125677.1122436,"['Polygon Bridge & Staking', 'Polygon Bridge & Staking']","['polygon-bridge-&-staking', 'polygon-bridge-&-staking']"
+267,polygon-zkevm-bridge,38912350.50524551,"['Polygon zkEVM Bridge', 'Polygon zkEVM Bridge']","['polygon-zkevm-bridge', 'polygon-zkevm-bridge']"
+268,polynomial-bridge,1977376.9220625106,['Polynomial Bridge'],['polynomial-bridge']
+269,ponytaswap,1007101.2597728347,['PonytaSwap'],['ponytaswap']
+270,pooltogether,6267149.550435386,"['PoolTogether V3', 'PoolTogether V5']","['pooltogether-v3', 'pooltogether-v5']"
+271,pulsechain,24951229.558334,"['Pulsechain', 'Pulsechain']","['pulsechain', 'pulsechain']"
+272,pulsechain-bridge,24949826.9530138,"['PulseChain Bridge', 'PulseChain Bridge']","['pulsechain-bridge', 'pulsechain-bridge']"
+273,pulsex,13156850.54943484,"['PulseX V1', 'PulseX V1', 'PulseX V2']","['pulsex-v1', 'pulsex-v1', 'pulsex-v2']"
+274,pump,15395228.496473951,"['PumpSwap', 'PumpSwap']","['pumpswap', 'pumpswap']"
+275,quickswap,425273484.12349045,"['Quickswap V3', 'Quickswap V3', 'Quickswap Dex']","['quickswap-v3', 'quickswap-v3', 'quickswap-dex']"
+276,railgun,17760013.439482898,"['Railgun', 'Railgun']","['railgun', 'railgun']"
+277,raydium,1296097981.704199,"['Raydium AMM', 'Raydium AMM', 'Raydium AMM']","['raydium-amm', 'raydium-amm', 'raydium-amm']"
+278,re7-labs,39435591.15832731,"['Re7 Labs', 'Re7 Labs']","['re7-labs', 're7-labs']"
+279,realt,155888951.37040323,"['RealT RMM Marketplace V2', 'RealT Tokens']","['realt-rmm-marketplace-v2', 'realt-tokens']"
+280,relend-network,75404190.24865088,['Relend Network'],['relend-network']
+281,reserve-protocol,27654843.186627105,"['Reserve Protocol', 'Reserve Protocol']","['reserve-protocol', 'reserve-protocol']"
+282,reservoir-protocol,30092784.22974209,['Reservoir Protocol'],['reservoir-protocol']
+283,reservoir-tools,3109476.380708566,"['Reservoir Tools AMM', 'Reservoir Tools CLMM']","['reservoir-tools-amm', 'reservoir-tools-clmm']"
+284,revert,4970731.730065526,['Revert Lend'],['revert-lend']
+285,reya-bridge,5934181.606025037,['Reya Bridge'],['reya-bridge']
+286,rhea-finance,3109341.367995238,"['Rhea Dex', 'Rhea Dex']","['rhea-dex', 'rhea-dex']"
+287,ring-protocol,5257965.5683084335,"['Ring Few', 'Ring Few']","['ring-few', 'ring-few']"
+288,royco-protocol,1355590.6465348927,['Royco Protocol'],['royco-protocol']
+289,rsk-bridge,1889187.991084,['RSK Bridge'],['rsk-bridge']
+290,rumpel-labs,55704157.65301,['Rumpel Labs'],['rumpel-labs']
+291,saber,1656018.6888642646,['Saber'],['saber']
+292,sailor,9614950.447981246,['Sailor'],['sailor']
+293,sandclock,1083146.031052778,['SandClock'],['sandclock']
+294,satori-finance,2192581.992918527,['Satori Perp'],['satori-perp']
+295,saucerswap,8905401.487819575,"['SaucerSwap V1', 'SaucerSwap V2']","['saucerswap-v1', 'saucerswap-v2']"
+296,save-protocol,13322030.853550576,"['Save', 'Save']","['save', 'save']"
+297,scallop,14303592.556299113,"['Scallop Lend', 'Scallop Lend']","['scallop-lend', 'scallop-lend']"
+298,scroll-bridge,28032099.695319213,"['Scroll Bridge', 'Scroll Bridge']","['scroll-bridge', 'scroll-bridge']"
+299,seamless-protocol,69786092.92789173,['Seamless Vaults'],['seamless-vaults']
+300,serum,9770272.584569218,['Serum'],['serum']
+301,shade-protocol,1445921.6634624042,['stkd-SCRT'],['stkd-scrt']
+302,shadow-exchange,6737901.973013973,"['Shadow Exchange Legacy', 'Shadow Exchange CLMM']","['shadow-exchange-legacy', 'shadow-exchange-clmm']"
+303,sigma-money,3585179.065966727,['Sigma Money'],['sigma-money']
+304,silo-finance,8597348.58450462,['Silo V2'],['silo-v2']
+305,sky,2414908319.7400346,['Sky Lending'],['sky-lending']
+306,sonic-gateway,2706171.4951139633,"['Sonic Gateway', 'Sonic Gateway']","['sonic-gateway', 'sonic-gateway']"
+307,sonic-icp,3414330.901,['Sonic ICP'],['sonic-icp']
+308,sophon-bridge,5803527.613534514,"['Sophon Bridge', 'Sophon Bridge']","['sophon-bridge', 'sophon-bridge']"
+309,soroswap,7993526.271714502,['Soroswap'],['soroswap']
+310,spacefi,1007910.0249772322,['SpaceFi zkSync'],['spacefi-zksync']
+311,spark,117803400.2162661,"['SparkLend', 'Spark Liquidity Layer', 'SparkLend']","['sparklend', 'spark-liquidity-layer', 'sparklend']"
+312,spectra,3639848.1284114965,['Spectra V2'],['spectra-v2']
+313,sphere,10863214.871495206,"['Dyson', 'Sphere Finance']","['dyson', 'sphere-finance']"
+314,sprinter,1159183.0131227244,['Sprinter'],['sprinter']
+315,stabble,1097371.3333651815,['stabble'],['stabble']
+316,stability,1470967.6131088429,['Stability'],['stability']
+317,stablehodl,5361590.350053594,"['StableHodl', 'StableHodl']","['stablehodl', 'stablehodl']"
+318,stargate-finance,141515486.90348083,"['Stargate V2', 'Stargate V2', 'Stargate V1']","['stargate-v2', 'stargate-v2', 'stargate-v1']"
+319,starknet-bridge,67786061.07847081,"['Starknet Bridge', 'Starknet Bridge']","['starknet-bridge', 'starknet-bridge']"
+320,steakhouse-financial,931723023.6767356,"['Steakhouse Financial', 'Steakhouse Financial', 'Steakhouse Financial']","['steakhouse-financial', 'steakhouse-financial', 'steakhouse-financial']"
+321,stellar-dex,26971973.651569,['Stellar DEX'],['stellar-dex']
+322,stream-finance,99879868.97327672,['Stream Finance'],['stream-finance']
+323,stusdt,60689695.59128867,['stUSDT'],['stusdt']
+324,suibridge,57589628.572361,['SuiBridge'],['suibridge']
+325,suilend-protocol,7777924.258490323,"['STEAMM', 'Suilend']","['steamm', 'suilend']"
+326,summer.fi,62285006.91074922,"['Lazy Summer Protocol', 'Lazy Summer Protocol']","['lazy-summer-protocol', 'lazy-summer-protocol']"
+327,sun,522207361.30680335,"['SUN.io', 'SUNSwap V3', 'SUNSwap V2', 'SUNSwap V1']","['sun.io', 'sunswap-v3', 'sunswap-v2', 'sunswap-v1']"
+328,superfluid,1647652.5055548307,['Superfluid'],['superfluid']
+329,superform,81695993.62611803,['Superform'],['superform']
+330,superlend.xyz,4164521.6565206638,"['Superlend', 'Superfund']","['superlend', 'superfund']"
+331,sushi,136779570.5847256,"['SushiSwap V3', 'SushiSwap']","['sushiswap-v3', 'sushiswap']"
+332,swaap,4033673.3614817243,"['Swaap Maker V2', 'Swaap Maker V2']","['swaap-maker-v2', 'swaap-maker-v2']"
+333,swappi,1887902.0292306787,['Swappi'],['swappi']
+334,swapx,2068799.933076963,['SwapX Algebra'],['swapx-algebra']
+335,sx-rollup-bridge,3943476.7850865563,['SX Rollup Bridge'],['sx-rollup-bridge']
+336,symbiosis,5533488.05815299,"['Symbiosis', 'Symbiosis']","['symbiosis', 'symbiosis']"
+337,synapse,2494195.260159335,"['Synapse', 'Synapse']","['synapse', 'synapse']"
+338,syncswap-protocol,11013770.568984034,"['SyncSwap', 'SyncSwap']","['syncswap', 'syncswap']"
+339,synfutures,5749088.189377417,['SynFutures V3'],['synfutures-v3']
+340,taiko-bridge,1067878.0643900423,['Taiko Bridge'],['taiko-bridge']
+341,takara-lend,3278225.697719301,['Takara Lend'],['takara-lend']
+342,tapp-exchange,5253179.112584241,"['Tapp Exchange', 'Tapp Exchange']","['tapp-exchange', 'tapp-exchange']"
+343,team-finance,3048508.227751297,"['Team Finance', 'Team Finance']","['team-finance', 'team-finance']"
+344,tectonic,86076505.45917583,"['Tectonic', 'Tectonic']","['tectonic', 'tectonic']"
+345,termmax,5413875.012547541,['TermMax'],['termmax']
+346,thala,33601735.174883254,"['ThalaSwap', 'ThalaSwap V2', 'ThalaSwap V2']","['thalaswap', 'thalaswap-v2', 'thalaswap-v2']"
+347,thena,3221962.429504606,"['THENA INTEGRAL', 'THENA V1']","['thena-integral', 'thena-v1']"
+348,theo,8699331.980064878,['Theo'],['theo']
+349,thetanuts-finance,1895445.3233185138,['Thetanuts Finance'],['thetanuts-finance']
+350,thorchain-dex,10064612.394761615,"['Thorchain DEX', 'Thorchain DEX']","['thorchain-dex', 'thorchain-dex']"
+351,tinyman,12064776.445223,['Tinyman'],['tinyman']
+352,tokemak,53196291.87914083,['Tokemak'],['tokemak']
+353,tulipa-capital,21295671.918416824,['Tulipa Capital'],['tulipa-capital']
+354,turbos,5136555.304258233,"['Turbos', 'Turbos']","['turbos', 'turbos']"
+355,turtle-club,1073057.994319,['Turtle Club'],['turtle-club']
+356,typus-finance,3371108.8103757207,"['Typus Perp', 'Typus DOV']","['typus-perp', 'typus-dov']"
+357,uncx-network,11664345.734904435,"['UNCX Network V2', 'UNCX Network V3', 'UNCX Network V3', 'UNCX Network V2']","['uncx-network-v2', 'uncx-network-v3', 'uncx-network-v3', 'uncx-network-v2']"
+358,uniswap,2604356457.150937,"['Uniswap V2', 'Uniswap V4', 'Uniswap V3', 'Uniswap V4', 'Uniswap V3', 'Uniswap V2']","['uniswap-v2', 'uniswap-v4', 'uniswap-v3', 'uniswap-v4', 'uniswap-v3', 'uniswap-v2']"
+359,unitas,9899830.303168364,['Unitas'],['unitas']
+360,upshift,71079147.56211925,['Upshift'],['upshift']
+361,usdd,58302504.999541,['USDD'],['usdd']
+362,usdt0,2779566039.447921,['USDT0'],['usdt0']
+363,vanswap,1889300.7562500746,['VanSwap'],['vanswap']
+364,varlamore-capital,14697754.702015847,"['Varlamore Capital', 'Varlamore Capital']","['varlamore-capital', 'varlamore-capital']"
+365,vault-bridge,150383161.58665496,"['Vault Bridge', 'Vault Bridge']","['vault-bridge', 'vault-bridge']"
+366,vectis-finance,3743492.6270011994,['Vectis Finance'],['vectis-finance']
+367,veda,1101975018.3155453,"['Veda', 'Veda']","['veda', 'veda']"
+368,velodrome,14463034.613602405,"['Velodrome V3', 'Velodrome V2', 'Velodrome V3']","['velodrome-v3', 'velodrome-v2', 'velodrome-v3']"
+369,venombridge,3582525.636219768,['VenomBridge'],['venombridge']
+370,venus,141978067.97038314,"['Venus Core Pool', 'Venus Core Pool', 'Venus Core Pool']","['venus-core-pool', 'venus-core-pool', 'venus-core-pool']"
+371,vesper,2266160.641158565,['Vesper'],['vesper']
+372,vest-exchange,2010645.7363358864,['Vest Exchange'],['vest-exchange']
+373,vesta-equity,20634337.0,['Vesta Equity'],['vesta-equity']
+374,vesu,1836894.8230047089,['Vesu'],['vesu']
+375,vvs-finance,61082434.638187185,"['VVS Standard', 'VVS Standard']","['vvs-standard', 'vvs-standard']"
+376,wan-bridge,6568414.257988153,"['Wan Bridge', 'Wan Bridge']","['wan-bridge', 'wan-bridge']"
+377,wasabi,12646051.950885374,['Wasabi'],['wasabi']
+378,waves-exchange,3018708.67074775,"['Waves Exchange', 'Waves Exchange']","['waves-exchange', 'waves-exchange']"
+379,whaleex,2426381.86411885,['WhaleEx'],['whaleex']
+380,whales-market,4928001.583743467,['Whales Market'],['whales-market']
+381,wildcat-protocol,3493706.936077126,['Wildcat Protocol'],['wildcat-protocol']
+382,woofi,14381221.526180932,"['WOOFi Swap', 'WOOFi Earn']","['woofi-swap', 'woofi-earn']"
+383,xdai-stake-bridge,22500051.89040074,"['xDAI Stake Bridge', 'xDAI Stake Bridge']","['xdai-stake-bridge', 'xdai-stake-bridge']"
+384,xlink,1901774.8327620223,['XLink'],['xlink']
+385,xwin-finance,8163774.452509339,['xWin Finance'],['xwin-finance']
+386,yala,6523371.404490965,['Yala'],['yala']
+387,yearn,48398528.82818802,"['Yearn Finance', 'Yearn Curating', 'Yearn Curating', 'Yearn Finance']","['yearn-finance', 'yearn-curating', 'yearn-curating', 'yearn-finance']"
+388,yei-finance,137019611.05866998,['YeiLend'],['yeilend']
+389,yield-yak,1235332.5361377979,['Yield Yak Aggregator'],['yield-yak-aggregator']
+390,yieldoor,1915791.3501576206,['Yieldoor'],['yieldoor']
+391,yo-protocol,20243815.589010872,['YO Protocol'],['yo-protocol']
+392,youves,13388517.336539,['Youves'],['youves']
+393,zerobase-cedefi,36612556.21924838,"['ZEROBASE CeDeFi', 'ZEROBASE CeDeFi']","['zerobase-cedefi', 'zerobase-cedefi']"
+394,zerolend,6191300.400815874,"['ZeroLend Vaults', 'ZeroLend Vaults']","['zerolend-vaults', 'zerolend-vaults']"
+395,zeta,1302379.510777721,['Zeta'],['zeta']
+396,zksync-era-txbridge,36489051.16491239,"['zkSync Era txBridge', 'zkSync Era txBridge']","['zksync-era-txbridge', 'zksync-era-txbridge']"
+397,zksync-lite-bridge,7197549.453043543,"['zkSync Lite Bridge', 'zkSync Lite Bridge']","['zksync-lite-bridge', 'zksync-lite-bridge']"
+398,zoth,1600000.0,['ZTLN-P'],['ztln-p']

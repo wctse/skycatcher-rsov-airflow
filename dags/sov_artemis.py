@@ -37,7 +37,8 @@ ASSETS = [
     'solana',
     'sui',
     'ton',
-    'hyperliquid'
+    'hyperliquid',
+    'plasma'
 ]
 
 # Data directory
@@ -222,8 +223,15 @@ def parse_latest_dates(delta=0):
         dune_date = rds_date = '2010-01-01'
 
     # Convert string dates to datetime objects for comparison
-    dune_date = datetime.strptime(dune_date, '%Y-%m-%d') + timedelta(days=delta)
-    rds_date = datetime.strptime(rds_date, '%Y-%m-%d') + timedelta(days=delta)
+    try:
+        dune_date = datetime.strptime(dune_date, '%Y-%m-%d') + timedelta(days=delta)
+    except Exception:
+        dune_date = datetime.strptime('2010-01-01', '%Y-%m-%d') + timedelta(days=delta)
+
+    try:
+        rds_date = datetime.strptime(rds_date, '%Y-%m-%d') + timedelta(days=delta)
+    except Exception:
+        rds_date = datetime.strptime('2010-01-01', '%Y-%m-%d') + timedelta(days=delta)
 
     print(f"Dune date: {dune_date}")
     print(f"RDS date: {rds_date}")

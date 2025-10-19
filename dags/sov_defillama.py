@@ -62,7 +62,8 @@ TOKENS_CONFIG = {
     "sei": ["SEI", "WSEI", "ISEI"],
     "sonic": ["S", "WS", "STS"],
     "hyperliquid": ["HYPE", "WHYPE", "STHYPE", "LHYPE"],
-    "zora": ["ZORA"]
+    "zora": ["ZORA"],
+    "plasma": ["XPL", "UXPL", "WXPL"]
 }
 
 IGNORES_LIST = [
@@ -117,7 +118,8 @@ ASSET_MAPPING = {
     'tao': {'chain': 'Bittensor', 'name': 'bittensor'},
     'sonic': {'chain': 'Sonic', 'name': 'sonic'},
     'hyperliquid': {'chain': 'Hyperliquid', 'name': 'hyperliquid'},
-    'zora': {'chain': 'Zora', 'name': 'zora'}
+    'zora': {'chain': 'Zora', 'name': 'zora'},
+    'plasma': {'chain': 'Plasma', 'name': 'plasma'}
 }
 
 CATEGORIES_TO_IGNORE = ['Liquid Staking', 'Liquid Restaking', 'CEX', 'Yield Aggregator']

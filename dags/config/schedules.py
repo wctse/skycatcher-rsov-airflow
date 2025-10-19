@@ -24,6 +24,7 @@ DAG_DEFINITIONS = [
     ('pendle_pt_yt_prices', 20, 'Pendle PT/YT prices data pipeline'),
     ('sov_taostats_subnet_pools', 60, 'A DAG for fetching, processing and uploading pool history data'),
     ('btc_amounts', 15, 'BTC amounts data pipeline'),
+    ('stablecoin_amounts', 15, 'Stablecoins amounts data pipeline'),
     ('apys_defillama', 45, 'APYs from DefiLlama pipeline'),
     ('sov_defillama', 60, 'SOV DefiLlama data pipeline'),
 ]

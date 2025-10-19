@@ -61,7 +61,7 @@ CONFIGS = [
         "type": "query",
         "query_id": 4794474,
         "date_column": "date",
-    }
+    },
     {
         "rds_table_name": "aero_buybacks_newlocks",
         "type": "query",
