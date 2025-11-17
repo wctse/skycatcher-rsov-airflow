@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 # Base configuration
 START_DATE = datetime(2025, 7, 7, 0, 0, 0)  # Base start date
-INTERVAL = timedelta(days=7)
+INTERVAL = timedelta(days=2)
 
 # Define DAGs with their execution times in minutes
 # The order here determines the scheduling order.
@@ -15,6 +15,7 @@ DAG_DEFINITIONS = [
     [
         ('sov_taostats_subnets', 10, 'A DAG for fetching, processing and uploading subnet data'),
         ('sov_taostats_network', 5, 'A DAG for fetching, processing and uploading network stats'),
+        ('sov_taostats_prices', 5, 'A DAG for fetching, processing and uploading TAO price data'),
         ('sov_artemis', 5, 'SOV Artemis data pipeline'),
         ('pendle_transactions', 3, 'Pendle transactions data pipeline'),
         ('pendle_markets', 3, 'Pendle markets data pipeline'),
