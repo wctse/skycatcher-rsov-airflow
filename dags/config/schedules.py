@@ -28,6 +28,7 @@ DAG_DEFINITIONS = [
     ('stablecoin_amounts', 15, 'Stablecoins amounts data pipeline'),
     ('apys_defillama', 45, 'APYs from DefiLlama pipeline'),
     ('sov_defillama', 60, 'SOV DefiLlama data pipeline'),
+    ('cryptoquant_metrics', 45, 'CryptoQuant metrics ingestion pipeline'),
 ]
 
 # Generate DAG configurations with calculated start times
