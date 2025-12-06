@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 # Base configuration
 START_DATE = datetime(2025, 7, 7, 0, 0, 0)  # Base start date
-INTERVAL = timedelta(days=2)
+INTERVAL = timedelta(days=7)
 
 # Define DAGs with their execution times in minutes
 # The order here determines the scheduling order.
