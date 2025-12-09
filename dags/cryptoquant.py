@@ -3,7 +3,7 @@
 import logging
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import requests
@@ -25,22 +25,26 @@ logger.setLevel(logging.INFO)
 CRYPTOQUANT_BASE_URL = "https://api.cryptoquant.com/v1"
 CRYPTOQUANT_API_KEY_VAR = "api_key_cryptoquant"
 DRY_RUN_ENABLED = False
-CRYPTOQUANT_TABLE = "cryptoquant_metrics"
+CRYPTOQUANT_TABLE = "coin_metrics"
 DRY_RUN_LIMIT = 5
 REQUEST_TIMEOUT = 60
 REQUEST_PAUSE_SECONDS = 0.2
-DEFAULT_LIMIT = 1000
+DEFAULT_LIMIT = 10000
+_CREDIT_HEADERS_LOGGED = False
+RATE_LIMIT_MAX_RETRIES = 3
+RATE_LIMIT_BACKOFF_SECONDS = 5
 
 
+# ERC20 tokens supported by CryptoQuant's ERC20 price-ohlcv endpoint.
+# The API rejects the commented tokens with 400 "Invalid '<token>' token".
 ERC20_SPOT_TOKENS = [
-    "eth",
-    "sol",
-    "hype",
+    # "sol",   # Not in CryptoQuant supported ERC20 list; API returns invalid token.
+    # "hype",  # Not in CryptoQuant supported ERC20 list; API returns invalid token.
     "aave",
-    "pendle",
-    "aero",
-    "tao",
-    "ldo",
+    # "pendle",  # Not in CryptoQuant supported ERC20 list; API returns invalid token.
+    # "aero",  # Not in CryptoQuant supported ERC20 list; API returns invalid token.
+    # "tao",   # Not in CryptoQuant supported ERC20 list; API returns invalid token.
+    # "ldo",   # Not in CryptoQuant supported ERC20 list; API returns invalid token.
     "uni",
 ]
 
@@ -50,10 +54,55 @@ MetricConfig = Dict[str, Any]
 
 METRIC_CONFIGS: List[MetricConfig] = [
     {
-        "metric": "spot_volume",
+        "metric": "price_close",
+        "endpoint": "/btc/market-data/price-ohlcv",
+        "value_key": "close",
+        "timestamp_key": "date",
+        "timeframe": "day",
+        "source": "cryptoquant:/btc/market-data/price-ohlcv",
+        "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
+        "assets": [
+            {
+                "asset_symbol": "btc",
+                "request_params": {},
+            }
+        ],
+    },
+    {
+        "metric": "price_close",
+        "endpoint": "/eth/market-data/price-ohlcv",
+        "value_key": "close",
+        "timestamp_key": "date",
+        "timeframe": "day",
+        "source": "cryptoquant:/eth/market-data/price-ohlcv",
+        "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
+        "assets": [
+            {
+                "asset_symbol": "eth",
+                "request_params": {},
+            }
+        ],
+    },
+    {
+        "metric": "price_close",
+        "endpoint": "/alt/market-data/price-ohlcv",
+        "value_key": "close",
+        "timestamp_key": "date",
+        "timeframe": "day",
+        "source": "cryptoquant:/alt/market-data/price-ohlcv",
+        "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
+        "assets": [
+            {
+                "asset_symbol": "sol",
+                "request_params": {"token": "sol"},
+            }
+        ],
+    },
+    {
+        "metric": "price_close",
         "endpoint": "/erc20/market-data/price-ohlcv",
-        "value_key": "volume",
-        "timestamp_key": "timestamp",
+        "value_key": "close",
+        "timestamp_key": "date",
         "timeframe": "day",
         "source": "cryptoquant:/erc20/market-data/price-ohlcv",
         "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
@@ -66,40 +115,14 @@ METRIC_CONFIGS: List[MetricConfig] = [
         ],
     },
     {
-        "metric": "futures_volume_btc",
-        "endpoint": "/btc/market-data/price-ohlcv",
-        "value_key": "volume",
-        "timestamp_key": "timestamp",
-        "timeframe": "day",
-        "source": "cryptoquant:/btc/market-data/price-ohlcv",
-        "static_params": {
-            "market": "perpetual",
-            "exchange": "all_exchange",
-            "symbol": "all_symbol",
-            "window": "day",
-            "limit": DEFAULT_LIMIT,
-        },
-        "assets": [
-            {
-                "asset_symbol": "btc",
-                "request_params": {},
-            }
-        ],
-    },
-    {
-        "metric": "futures_volume_eth",
+        # ETH is not supported by the ERC20 endpoint; use native ETH price-ohlcv.
+        "metric": "spot_volume",
         "endpoint": "/eth/market-data/price-ohlcv",
         "value_key": "volume",
-        "timestamp_key": "timestamp",
+        "timestamp_key": "date",
         "timeframe": "day",
         "source": "cryptoquant:/eth/market-data/price-ohlcv",
-        "static_params": {
-            "market": "perpetual",
-            "exchange": "all_exchange",
-            "symbol": "all_symbol",
-            "window": "day",
-            "limit": DEFAULT_LIMIT,
-        },
+        "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
         "assets": [
             {
                 "asset_symbol": "eth",
@@ -108,30 +131,73 @@ METRIC_CONFIGS: List[MetricConfig] = [
         ],
     },
     {
-        "metric": "futures_open_interest_btc",
+        # Solana lives under the Alt list (not ERC20); use alt price-ohlcv.
+        "metric": "spot_volume",
+        "endpoint": "/alt/market-data/price-ohlcv",
+        "value_key": "volume",
+        "timestamp_key": "date",
+        "timeframe": "day",
+        "source": "cryptoquant:/alt/market-data/price-ohlcv",
+        "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
+        "assets": [
+            {
+                "asset_symbol": "sol",
+                "request_params": {"token": "sol"},
+            }
+        ],
+    },
+    {
+        "metric": "spot_volume",
+        "endpoint": "/erc20/market-data/price-ohlcv",
+        "value_key": "volume",
+        "timestamp_key": "date",
+        "timeframe": "day",
+        "source": "cryptoquant:/erc20/market-data/price-ohlcv",
+        "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
+        "assets": [
+            {
+                "asset_symbol": token,
+                "request_params": {"token": token},
+            }
+            for token in ERC20_SPOT_TOKENS
+        ],
+    },
+    {
+        # Derivatives: open interest in USD (closest to futures OI/volume aggregate)
+        "metric": "futures_open_interest",
         "endpoint": "/btc/market-data/open-interest",
         "value_key": "open_interest",
-        "timestamp_key": "timestamp",
+        "timestamp_key": "date",
         "timeframe": "day",
         "source": "cryptoquant:/btc/market-data/open-interest",
         "static_params": {"exchange": "all_exchange", "window": "day", "limit": DEFAULT_LIMIT},
-        "assets": [{"asset_symbol": "btc", "request_params": {}}],
+        "assets": [
+            {
+                "asset_symbol": "btc",
+                "request_params": {},
+            }
+        ],
     },
     {
-        "metric": "futures_open_interest_eth",
+        "metric": "futures_open_interest",
         "endpoint": "/eth/market-data/open-interest",
         "value_key": "open_interest",
-        "timestamp_key": "timestamp",
+        "timestamp_key": "date",
         "timeframe": "day",
         "source": "cryptoquant:/eth/market-data/open-interest",
         "static_params": {"exchange": "all_exchange", "window": "day", "limit": DEFAULT_LIMIT},
-        "assets": [{"asset_symbol": "eth", "request_params": {}}],
+        "assets": [
+            {
+                "asset_symbol": "eth",
+                "request_params": {},
+            }
+        ],
     },
     {
         "metric": "mvrv",
         "endpoint": "/btc/market-indicator/mvrv",
         "value_key": "mvrv",
-        "timestamp_key": "timestamp",
+        "timestamp_key": "date",
         "timeframe": "day",
         "source": "cryptoquant:/btc/market-indicator/mvrv",
         "static_params": {"window": "day", "limit": DEFAULT_LIMIT},
@@ -141,19 +207,9 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "metric": "sopr",
         "endpoint": "/btc/market-indicator/sopr",
         "value_key": "sopr",
-        "timestamp_key": "timestamp",
+        "timestamp_key": "date",
         "timeframe": "day",
         "source": "cryptoquant:/btc/market-indicator/sopr",
-        "static_params": {"window": "day", "limit": DEFAULT_LIMIT},
-        "assets": [{"asset_symbol": "btc", "request_params": {}}],
-    },
-    {
-        "metric": "nupl",
-        "endpoint": "/btc/market-indicator/nupl",
-        "value_key": "nupl",
-        "timestamp_key": "timestamp",
-        "timeframe": "day",
-        "source": "cryptoquant:/btc/market-indicator/nupl",
         "static_params": {"window": "day", "limit": DEFAULT_LIMIT},
         "assets": [{"asset_symbol": "btc", "request_params": {}}],
     },
@@ -161,7 +217,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "metric": "stablecoin_supply_ratio",
         "endpoint": "/btc/market-indicator/stablecoin-supply-ratio",
         "value_key": "stablecoin_supply_ratio",
-        "timestamp_key": "timestamp",
+        "timestamp_key": "date",
         "timeframe": "day",
         "source": "cryptoquant:/btc/market-indicator/stablecoin-supply-ratio",
         "static_params": {"window": "day", "limit": DEFAULT_LIMIT},
@@ -196,14 +252,60 @@ def make_cryptoquant_request(
 ) -> List[Dict[str, Any]]:
     """Call the CryptoQuant API and return the result payload."""
 
+    global _CREDIT_HEADERS_LOGGED
+
     url = f"{CRYPTOQUANT_BASE_URL}{endpoint}"
     headers = {"Authorization": f"Bearer {api_key}"}
-    response = session.get(url, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
-    logger.debug("Request %s params=%s status=%s", endpoint, params, response.status_code)
-    if response.status_code != 200:
-        raise AirflowException(
-            f"CryptoQuant request failed ({response.status_code}): {response.text}"
-        )
+
+    response = None
+    for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
+        response = session.get(url, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
+        logger.debug("Request %s params=%s status=%s", endpoint, params, response.status_code)
+
+        # Log credit/rate-limit headers once per run if available.
+        if not _CREDIT_HEADERS_LOGGED:
+            credit_headers = {
+                k: v
+                for k, v in response.headers.items()
+                if k.lower()
+                in {
+                    "x-ratelimit-remaining",
+                    "x-ratelimit-limit",
+                    "x-ratelimit-reset",
+                    "x-quota-remaining",
+                    "x-quota-limit",
+                }
+            }
+            if credit_headers:
+                logger.info("CryptoQuant credit info: %s", credit_headers)
+            _CREDIT_HEADERS_LOGGED = True
+
+        if response.status_code == 429:
+            reset_header = response.headers.get("x-ratelimit-reset")
+            try:
+                sleep_seconds = max(int(reset_header), 1) if reset_header is not None else None
+            except ValueError:
+                sleep_seconds = None
+            if sleep_seconds is None:
+                sleep_seconds = RATE_LIMIT_BACKOFF_SECONDS * (attempt + 1)
+            logger.warning(
+                "Received 429 from CryptoQuant for %s; sleeping %s seconds before retry (%s/%s)",
+                endpoint,
+                sleep_seconds,
+                attempt + 1,
+                RATE_LIMIT_MAX_RETRIES,
+            )
+            time.sleep(sleep_seconds)
+            continue
+
+        if response.status_code != 200:
+            raise AirflowException(
+                f"CryptoQuant request failed ({response.status_code}): {response.text}"
+            )
+
+        break
+    else:
+        raise AirflowException(f"CryptoQuant request failed after {RATE_LIMIT_MAX_RETRIES} retries")
 
     payload = response.json()
     status = payload.get("status", {})
@@ -281,18 +383,23 @@ def normalize_dataframe(
     timeframe: str,
     source: str,
     latest_ts: Optional[datetime],
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame, Optional[str]]:
     """Convert raw API rows into the canonical table schema."""
 
     if not raw_rows:
-        return pd.DataFrame()
+        return pd.DataFrame(), None
 
     df = pd.DataFrame(raw_rows)
     if df.empty or timestamp_key not in df.columns or value_key not in df.columns:
         logger.warning(
-            "Missing expected columns for metric %s (asset=%s)", metric, asset_symbol
+            "Missing expected columns for metric %s (asset=%s). Columns=%s sample=%s",
+            metric,
+            asset_symbol,
+            list(df.columns),
+            raw_rows[0] if raw_rows else {},
         )
-        return pd.DataFrame()
+        # Push the raw sample row back to Airflow logs/XCom if present to help mapping.
+        return pd.DataFrame(), "missing_columns"
 
     df["timestamp"] = pd.to_datetime(df[timestamp_key], utc=True, errors="coerce")
     df["value"] = pd.to_numeric(df[value_key], errors="coerce")
@@ -306,7 +413,7 @@ def normalize_dataframe(
         df = df[df["timestamp"] > latest_ts_utc]
 
     if df.empty:
-        return df
+        return df, None
 
     df["timestamp"] = df["timestamp"].dt.tz_convert("UTC").dt.tz_localize(None)
     df["asset_symbol"] = asset_symbol
@@ -315,16 +422,19 @@ def normalize_dataframe(
     df["source"] = source
     df = df[["timestamp", "timeframe", "asset_symbol", "metric", "source", "value"]]
     df = df.drop_duplicates(subset=["timestamp", "timeframe", "asset_symbol", "metric"])
-    return df
+    return df, None
 
 
-def fetch_and_store_cryptoquant_metrics(**_: Any) -> None:
+def fetch_and_store_cryptoquant_metrics(**context: Any) -> None:
     """Main task that fetches CryptoQuant metrics and loads them into Postgres."""
 
     api_key = load_api_key(CRYPTOQUANT_API_KEY_VAR)
     dry_run = is_dry_run()
     session = requests.Session()
     frames: List[pd.DataFrame] = []
+    failed_requests: List[str] = []
+    missing_columns: List[str] = []
+    ti = context.get("ti")
 
     try:
         for config in METRIC_CONFIGS:
@@ -353,13 +463,21 @@ def fetch_and_store_cryptoquant_metrics(**_: Any) -> None:
 
                 try:
                     raw_rows = make_cryptoquant_request(session, api_key, endpoint, params)
+                    if raw_rows:
+                        logger.debug(
+                            "Sample raw row for metric=%s asset=%s: %s",
+                            metric,
+                            asset_symbol,
+                            raw_rows[0],
+                        )
                 except AirflowException as exc:
                     logger.error(
                         "Failed to fetch metric %s for asset %s: %s", metric, asset_symbol, exc
                     )
+                    failed_requests.append(f"{metric}:{asset_symbol} ({exc})")
                     continue
 
-                df = normalize_dataframe(
+                df, issue = normalize_dataframe(
                     raw_rows,
                     value_key=value_key,
                     timestamp_key=timestamp_key,
@@ -369,6 +487,8 @@ def fetch_and_store_cryptoquant_metrics(**_: Any) -> None:
                     source=source,
                     latest_ts=latest_ts,
                 )
+                if issue == "missing_columns":
+                    missing_columns.append(f"{metric}:{asset_symbol}")
 
                 if df.empty:
                     logger.info(
@@ -391,7 +511,24 @@ def fetch_and_store_cryptoquant_metrics(**_: Any) -> None:
                 time.sleep(REQUEST_PAUSE_SECONDS)
 
         if not frames:
-            logger.info("No new CryptoQuant data to ingest.")
+            if failed_requests or missing_columns:
+                logger.warning(
+                    "No new CryptoQuant data ingested. Failures=%s missing_columns=%s",
+                    failed_requests if failed_requests else "none",
+                    missing_columns if missing_columns else "none",
+                )
+            else:
+                logger.info("No new CryptoQuant data to ingest.")
+            if ti:
+                ti.xcom_push(
+                    key="cryptoquant_warnings",
+                    value={
+                        "ingested_rows": 0,
+                        "failed_requests": failed_requests,
+                        "missing_columns": missing_columns,
+                        "dry_run": dry_run,
+                    },
+                )
             return
 
         final_df = pd.concat(frames, ignore_index=True)
@@ -403,12 +540,22 @@ def fetch_and_store_cryptoquant_metrics(**_: Any) -> None:
                 len(final_df),
                 final_df.head().to_string(index=False) if not final_df.empty else "[]",
             )
+            if ti:
+                ti.xcom_push(
+                    key="cryptoquant_warnings",
+                    value={
+                        "ingested_rows": len(final_df),
+                        "failed_requests": failed_requests,
+                        "missing_columns": missing_columns,
+                        "dry_run": True,
+                    },
+                )
             return
 
         with rds_engine.begin() as conn:
             final_df.to_sql(
                 CRYPTOQUANT_TABLE,
-                con=conn.connection,
+                con=conn,
                 if_exists="append",
                 index=False,
                 method="multi",
@@ -416,6 +563,22 @@ def fetch_and_store_cryptoquant_metrics(**_: Any) -> None:
             )
 
         logger.info("Inserted %s rows into %s", len(final_df), CRYPTOQUANT_TABLE)
+        if failed_requests or missing_columns:
+            logger.warning(
+                "Completed with partial issues. Failed requests=%s; missing_columns=%s",
+                failed_requests if failed_requests else "none",
+                missing_columns if missing_columns else "none",
+            )
+        if ti:
+            ti.xcom_push(
+                key="cryptoquant_warnings",
+                value={
+                    "ingested_rows": len(final_df),
+                    "failed_requests": failed_requests,
+                    "missing_columns": missing_columns,
+                    "dry_run": False,
+                },
+            )
     finally:
         session.close()
 
