@@ -24,7 +24,7 @@ logger.setLevel(logging.INFO)
 
 CRYPTOQUANT_BASE_URL = "https://api.cryptoquant.com/v1"
 CRYPTOQUANT_API_KEY_VAR = "api_key_cryptoquant"
-DRY_RUN_ENABLED = False
+DRY_RUN_ENABLED = True
 CRYPTOQUANT_TABLE = "coin_metrics"
 DRY_RUN_LIMIT = 5
 REQUEST_TIMEOUT = 60
@@ -33,6 +33,7 @@ DEFAULT_LIMIT = 10000
 _CREDIT_HEADERS_LOGGED = False
 RATE_LIMIT_MAX_RETRIES = 3
 RATE_LIMIT_BACKOFF_SECONDS = 5
+CRYPTOQUANT_SOURCE = "cryptoquant"
 
 
 # ERC20 tokens supported by CryptoQuant's ERC20 price-ohlcv endpoint.
@@ -59,7 +60,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "close",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/btc/market-data/price-ohlcv",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
         "assets": [
             {
@@ -74,7 +75,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "close",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/eth/market-data/price-ohlcv",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
         "assets": [
             {
@@ -89,7 +90,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "close",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/alt/market-data/price-ohlcv",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
         "assets": [
             {
@@ -104,7 +105,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "close",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/erc20/market-data/price-ohlcv",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
         "assets": [
             {
@@ -121,7 +122,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "volume",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/eth/market-data/price-ohlcv",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
         "assets": [
             {
@@ -137,7 +138,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "volume",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/alt/market-data/price-ohlcv",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
         "assets": [
             {
@@ -152,7 +153,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "volume",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/erc20/market-data/price-ohlcv",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"window": "day", "format": "json", "limit": DEFAULT_LIMIT},
         "assets": [
             {
@@ -169,7 +170,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "open_interest",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/btc/market-data/open-interest",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"exchange": "all_exchange", "window": "day", "limit": DEFAULT_LIMIT},
         "assets": [
             {
@@ -184,7 +185,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "open_interest",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/eth/market-data/open-interest",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"exchange": "all_exchange", "window": "day", "limit": DEFAULT_LIMIT},
         "assets": [
             {
@@ -199,7 +200,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "mvrv",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/btc/market-indicator/mvrv",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"window": "day", "limit": DEFAULT_LIMIT},
         "assets": [{"asset_symbol": "btc", "request_params": {}}],
     },
@@ -209,7 +210,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "sopr",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/btc/market-indicator/sopr",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"window": "day", "limit": DEFAULT_LIMIT},
         "assets": [{"asset_symbol": "btc", "request_params": {}}],
     },
@@ -219,7 +220,7 @@ METRIC_CONFIGS: List[MetricConfig] = [
         "value_key": "stablecoin_supply_ratio",
         "timestamp_key": "date",
         "timeframe": "day",
-        "source": "cryptoquant:/btc/market-indicator/stablecoin-supply-ratio",
+        "source": CRYPTOQUANT_SOURCE,
         "static_params": {"window": "day", "limit": DEFAULT_LIMIT},
         "assets": [{"asset_symbol": "btc", "request_params": {}}],
     },
@@ -260,7 +261,6 @@ def make_cryptoquant_request(
     response = None
     for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
         response = session.get(url, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
-        logger.debug("Request %s params=%s status=%s", endpoint, params, response.status_code)
 
         # Log credit/rate-limit headers once per run if available.
         if not _CREDIT_HEADERS_LOGGED:
@@ -330,7 +330,7 @@ def is_dry_run() -> bool:
     return DRY_RUN_ENABLED
 
 
-def get_latest_timestamp(asset_symbol: str, metric: str, timeframe: str) -> Optional[datetime]:
+def get_latest_timestamp(asset_symbol: str, metric: str, timeframe: str, source: str) -> Optional[datetime]:
     """Fetch the most recent timestamp already stored for the given series."""
 
     query = text(
@@ -340,11 +340,18 @@ def get_latest_timestamp(asset_symbol: str, metric: str, timeframe: str) -> Opti
         WHERE asset_symbol = :asset
           AND metric = :metric
           AND timeframe = :timeframe
+          AND source = :source
         """
     )
     with rds_engine.begin() as conn:
         max_ts = conn.execute(
-            query, {"asset": asset_symbol, "metric": metric, "timeframe": timeframe}
+            query,
+            {
+                "asset": asset_symbol,
+                "metric": metric,
+                "timeframe": timeframe,
+                "source": source,
+            },
         ).scalar()
     if max_ts is None:
         return None
@@ -453,23 +460,26 @@ def fetch_and_store_cryptoquant_metrics(**context: Any) -> None:
                 if dry_run:
                     params["limit"] = min(params["limit"], DRY_RUN_LIMIT)
 
-                latest_ts = None if dry_run else get_latest_timestamp(
-                    asset_symbol, metric, timeframe
-                )
-                if not dry_run:
+                latest_ts = get_latest_timestamp(asset_symbol, metric, timeframe, source)
+                if dry_run:
+                    from_param = build_from_parameter(latest_ts, timeframe) if latest_ts else None
+                    if from_param:
+                        params["from"] = from_param
+                    start_from = params.get("from") or "full history"
+                    logger.info(
+                        "Dry-run start window metric=%s asset=%s timeframe=%s start_from=%s",
+                        metric,
+                        asset_symbol,
+                        timeframe,
+                        start_from,
+                    )
+                else:
                     from_param = build_from_parameter(latest_ts, timeframe)
                     if from_param:
                         params["from"] = from_param
 
                 try:
                     raw_rows = make_cryptoquant_request(session, api_key, endpoint, params)
-                    if raw_rows:
-                        logger.debug(
-                            "Sample raw row for metric=%s asset=%s: %s",
-                            metric,
-                            asset_symbol,
-                            raw_rows[0],
-                        )
                 except AirflowException as exc:
                     logger.error(
                         "Failed to fetch metric %s for asset %s: %s", metric, asset_symbol, exc
