@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from airflow import DAG
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowFailException
 from airflow.hooks.base import BaseHook
 from airflow.models import Variable
 from airflow.operators.python import PythonOperator
@@ -34,7 +34,14 @@ DRY_RUN_LOOKBACK_DAYS = 3  # Window to pull when no history exists during dry-ru
 
 # Scope filters (empty -> no filtering)
 ASSET_FILTER: List[str] = []  # Assets to ingest across all runs.
-METRIC_FILTER: List[str] = ["us_spot_etf_balances_all", "us_spot_etf_flows_all", "us_spot_etf_flows_net"]  # Metrics to ingest across all runs.
+METRIC_FILTER: List[str] = [
+    "altcoin_cycle_signal",
+    "sopr",
+    "futures_open_interest_cash_margin",
+    "futures_open_interest_crypto_margin",
+    "mvrv_z_score",
+    "percent_addresses_in_profit",
+]  # Metrics to ingest across all runs.
 
 # Table/target
 TABLE_NAME = "coin_metrics"  # Target Postgres table for all Glassnode ingestions.
@@ -48,7 +55,33 @@ RATE_LIMIT_MAX_RETRIES = 2  # Number of retries on 429 responses.
 RATE_LIMIT_BACKOFF_SECONDS = 60  # Backoff base seconds between retries for 429.
 
 # Use the full token list (including previously commented tokens) to probe coverage.
-GLASSNODE_ASSETS = ["btc", "eth", "sol", "hype", "aave", "pendle", "ethfi", "ldo", "tao", "uni", "aero", "zec"]
+GLASSNODE_ASSETS = [
+    "btc",
+    "eth",
+    "sol",
+    "aave",
+    "uni",
+    "hype",
+    "pendle",
+    "ethfi",
+    "ldo",
+    "tao",
+    "aero",
+    "sui",
+    "bnb",
+    "link",
+    "ena",
+    "mon",
+    "zec",
+    "gs",
+    "pnkstr",
+    "sky",
+    "morpho",
+    "virtual",
+    "almanak",
+    "giza",
+    "lido",
+]
 
 # Per-endpoint allowlists based on Glassnode support to avoid 400s.
 TOP_TWO_ASSETS = ["btc", "eth"]
@@ -62,8 +95,8 @@ SCALAR_ASSET_ALLOWLISTS: Dict[str, List[str]] = {
     "futures_volume_all": GLASSNODE_ASSETS,
     "futures_volume_perpetual": GLASSNODE_ASSETS,
     "futures_open_interest": DERIVATIVE_ASSETS,
-    "futures_open_interest_cash_margin": DERIVATIVE_ASSETS,
-    "futures_open_interest_crypto_margin": DERIVATIVE_ASSETS,
+    "futures_open_interest_cash_margin": ["btc", "eth", "sol", "aave", "uni", "hype", "pendle", "ethfi", "ldo", "tao", "aero", "sui", "bnb", "link", "ena", "mon", "zec", "sky", "morpho", "virtual"],
+    "futures_open_interest_crypto_margin": ["btc", "eth", "sol", "aave", "uni", "hype", "pendle", "ethfi", "ldo", "tao", "aero", "sui", "bnb", "link", "ena", "mon", "zec", "sky", "morpho", "virtual"],
     "funding_rate_perpetual": DERIVATIVE_ASSETS,
     "funding_rate_perpetual_all": DERIVATIVE_ASSETS,
     "futures_open_interest_latest": DERIVATIVE_ASSETS,
@@ -663,6 +696,11 @@ def make_glassnode_request(
             time.sleep(sleep_seconds)
             continue
 
+        if response.status_code == 401:
+            raise AirflowFailException(
+                f"Glassnode request failed ({response.status_code}): {response.text} - Process stopped due to unauthorized access."
+            )
+
         if response.status_code != 200:
             raise AirflowException(
                 f"Glassnode request failed ({response.status_code}): {response.text}"
@@ -938,6 +976,8 @@ def fetch_and_store_glassnode_metrics(**context: Any) -> None:
                             asset_symbol,
                             raw_rows[0],
                         )
+                except AirflowFailException:
+                    raise
                 except AirflowException as exc:
                     logger.error(
                         "Failed to fetch metric %s for asset %s: %s. Continuing to next metric.",
