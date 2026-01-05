@@ -8,6 +8,14 @@ from typing import Dict, Any
 START_DATE = datetime(2025, 7, 7, 0, 0, 0)  # Base start date
 INTERVAL = timedelta(days=7)
 
+# Optional per-DAG start time overrides (UTC)
+CUSTOM_START_TIMES = {
+    # Run Glassnode ingestion at 09:00 UTC
+    "glassnode_metrics": (9, 0),
+    # Run CoinGecko ingestion at 09:00 UTC
+    "coingecko_metrics": (9, 0),
+}
+
 # Define DAGs with their execution times in minutes
 # The order here determines the scheduling order.
 # DAGs can be grouped in lists to run concurrently.
@@ -31,6 +39,7 @@ DAG_DEFINITIONS = [
     [
         ('cryptoquant_metrics', 45, 'CryptoQuant metrics ingestion pipeline'),
         ('glassnode_metrics', 45, 'GlassNode metrics ingestion pipeline'),
+        ('coingecko_metrics', 30, 'CoinGecko OHLC ingestion pipeline'),
     ],
 ]
 
@@ -56,6 +65,12 @@ for dag_group in DAG_DEFINITIONS:
     
     # Move to the next time slot
     current_time += timedelta(minutes=max_duration)
+
+# Apply start time overrides
+for dag_id, (hour, minute) in CUSTOM_START_TIMES.items():
+    if dag_id in DAG_CONFIGS:
+        start = DAG_CONFIGS[dag_id]["start_date"]
+        DAG_CONFIGS[dag_id]["start_date"] = start.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
 def get_schedule_interval(dag_id: str) -> timedelta:
     return DAG_CONFIGS[dag_id]['schedule_interval']
