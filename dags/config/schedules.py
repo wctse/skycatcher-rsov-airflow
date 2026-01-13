@@ -2,7 +2,7 @@
 Centralized configuration for all DAG schedules and start dates.
 """
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
 # Base configuration
 START_DATE = datetime(2025, 7, 7, 0, 0, 0)  # Base start date
@@ -14,6 +14,12 @@ CUSTOM_START_TIMES = {
     "glassnode_metrics": (9, 0),
     # Run CoinGecko ingestion at 09:00 UTC
     "coingecko_metrics": (9, 0),
+}
+
+# Optional per-DAG schedule interval overrides
+CUSTOM_SCHEDULE_INTERVALS = {
+    "glassnode_metrics": "0 9 * * *",
+    "coingecko_metrics": "0 9 * * *",
 }
 
 # Define DAGs with their execution times in minutes
@@ -72,7 +78,12 @@ for dag_id, (hour, minute) in CUSTOM_START_TIMES.items():
         start = DAG_CONFIGS[dag_id]["start_date"]
         DAG_CONFIGS[dag_id]["start_date"] = start.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
-def get_schedule_interval(dag_id: str) -> timedelta:
+# Apply schedule interval overrides
+for dag_id, interval in CUSTOM_SCHEDULE_INTERVALS.items():
+    if dag_id in DAG_CONFIGS:
+        DAG_CONFIGS[dag_id]["schedule_interval"] = interval
+
+def get_schedule_interval(dag_id: str) -> Union[timedelta, str]:
     return DAG_CONFIGS[dag_id]['schedule_interval']
 
 def get_start_date(dag_id: str) -> datetime:
